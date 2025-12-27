@@ -1724,7 +1724,7 @@ useEffect(() => {
           /* 조끼 색상 */
           --jersey-red:#E74C3C;
           --jersey-yellow:#F1C40F;
-          --jersey-green:#4CAF50:
+          --jersey-green:#4CAF50;
           --jersey-white:#EAEAEA;
           --jersey-stroke:#0a0b0f;
         }
