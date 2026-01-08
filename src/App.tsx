@@ -188,7 +188,7 @@ const SS_PIN_AUTHED = "goldin_futsal_admin_authed";
 const FIXED_PIN_HASH = "350c94d619f6aba3379500ff11bfcca6e58b0afe5b3624d0ad56fa607845e38c"; // sha256("8347")
 
 /* 팀별 조끼 색 (필요시 여기만 변경) */
-const TEAM_PINNIES: Record<TeamId, "red" | "yellow" | "white" | "green" > = { A: "red", B: "yellow", C: "white", D: "green" };
+const TEAM_PINNIES: Record<TeamId, "red" | "yellow" | "green" | "white" > = { A: "red", B: "yellow", C: "green", D: "white" };
 
 /* ====== 세션 초기화/로드 ====== */
 function emptySession(): Session {
@@ -381,7 +381,7 @@ function FormationPreview({
   players: Player[];
   teamName: string;
   formation: FormationKey;
-  color: "red" | "yellow" | "white" | "green";
+  color: "red" | "yellow" | "green" | "white";
 }) {
   // --- Selection (FORMATION = fields only; GK separate) ---
   const gkIds = roster.filter(id => (players.find(p => p.id === id)?.pos) === "GK");
@@ -397,7 +397,7 @@ function FormationPreview({
   const jerseyFill =
     color === "red" ? "var(--jersey-red)" :
     color === "yellow" ? "var(--jersey-yellow)" :
-    color === "white" ? "var(--jersey-white)" : "var(--jersey-green)";
+    color === "green" ? "var(--jersey-green)" : "var(--jersey-white)";
 
   return (
     <div className="formation-card">
@@ -1733,7 +1733,7 @@ useEffect(() => {
           /* 조끼 색상 */
           --jersey-red:#E74C3C;
           --jersey-yellow:#F1C40F;
-          --jersey-white:#EAEAEA;
+          --jersey-green:#81C784;
           --jersey-stroke:#0a0b0f;
         }
         *, *::before, *::after { box-sizing: border-box; }
