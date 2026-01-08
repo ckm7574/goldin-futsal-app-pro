@@ -1733,7 +1733,7 @@ useEffect(() => {
           /* 조끼 색상 */
           --jersey-red:#E74C3C;
           --jersey-yellow:#F1C40F;
-          --jersey-green:#81C784;
+          --jersey-green:#008000;
           --jersey-stroke:#0a0b0f;
         }
         *, *::before, *::after { box-sizing: border-box; }
