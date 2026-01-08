@@ -1338,7 +1338,7 @@ useEffect(() => {
                         <option value="3-1">3-1</option>
                         <option value="2-2-1">2-2-1</option>
                       </select>
-                      <span className="hint">조끼색: {TEAM_PINNIES[tid] === "red" ? "빨강" : TEAM_PINNIES[tid] === "yellow" ? "노랑" : TEAM_PINNIES[tid] === "green" ? "초록"}</span>
+                      <span className="hint">조끼색: {TEAM_PINNIES[tid] === "red" ? "빨강" : TEAM_PINNIES[tid] === "yellow" ? "노랑" : "초록"}</span>
                     </div>
 
                     <div className="list-scroll small">
