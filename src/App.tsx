@@ -1666,6 +1666,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                         <option value="2-2">2-2</option>
                         <option value="3-1">3-1</option>
                         <option value="2-2-1">2-2-1</option>
+                        <option value="2-2-2">2-2-2</option>
                       </select>
                       <span className="hint">조끼색: {TEAM_PINNIES[tid] === "red" ? "빨강" : TEAM_PINNIES[tid] === "yellow" ? "노랑" : "초록"}</span>
                     </div>
