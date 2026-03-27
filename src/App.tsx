@@ -1646,7 +1646,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                 const currentRoster = asArray(cur.rosters?.[tid], []);
                 const fieldCount = currentRoster.filter(pid => posOf(pid) !== "GK").length;
                 const byCount = (fieldCount >= 5 ? "2-2-1" : (fieldCount === 4 ? "1-2-1" : (fieldCount === 3 ? "1-2" : "1-2-1"))) as FormationKey;
-                const formation = (fieldCount >= 5 ? "2-2-1" as FormationKey : (requested ?? byCount) as FormationKey);
+                const formation = ((requested ?? byCount) as FormationKey);
 
                 return (
                   <div key={tid} className="team-card">
