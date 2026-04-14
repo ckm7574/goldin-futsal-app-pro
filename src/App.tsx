@@ -386,11 +386,19 @@ function normalizeLoaded(data: any): PersistShape {
         });
         matchStats[mid] = safe;
       });
-      const defAwards: Record<TeamId, string | null> = {
-        A: typeof s?.defAwards?.A === "string" ? s.defAwards.A : null,
-        B: typeof s?.defAwards?.B === "string" ? s.defAwards.B : null,
-        C: typeof s?.defAwards?.C === "string" ? s.defAwards.C : null,
-        D: typeof s?.defAwards?.D === "string" ? s.defAwards.D : null
+      const parseDefAward = (v: any): string | string[] | null => {
+        if (Array.isArray(v)) {
+          const arr = v.filter((x: any) => typeof x === "string" && x);
+          return arr.length > 0 ? arr : null;
+        }
+        if (typeof v === "string" && v) return v;
+        return null;
+      };
+      const defAwards: Record<TeamId, string | string[] | null> = {
+        A: parseDefAward(s?.defAwards?.A),
+        B: parseDefAward(s?.defAwards?.B),
+        C: parseDefAward(s?.defAwards?.C),
+        D: parseDefAward(s?.defAwards?.D),
       };
       const notes = String(s?.notes || "");
       
