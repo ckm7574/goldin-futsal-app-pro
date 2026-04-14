@@ -993,12 +993,8 @@ useEffect(() => {
   function copyViewerLink() { const url = new URL(window.location.href); url.searchParams.set("viewer", "1"); navigator.clipboard?.writeText(url.toString()); alert("보기 전용 링크가 복사되었습니다"); }
 
   const cur: Session = useMemo(() => sessionsByDate[ensureSunday(sessionDate)] ?? emptySession(), [sessionsByDate, sessionDate]);
-  const effectiveTeamNames: Record<TeamId, string> = useMemo(() => ({
-    A: cur.teamNames?.A || globalTeamNames.A || TEAM_LABELS.A,
-    B: cur.teamNames?.B || globalTeamNames.B || TEAM_LABELS.B,
-    C: cur.teamNames?.C || globalTeamNames.C || TEAM_LABELS.C,
-    D: cur.teamNames?.D || globalTeamNames.D || TEAM_LABELS.D,
-  }), [cur.teamNames, globalTeamNames]);
+  // 팀명은 항상 조끼 색 고정 (빨강/노랑/초록/흰색 팀)
+  const effectiveTeamNames: Record<TeamId, string> = TEAM_LABELS;
 
   
   // 날짜별(세션별) 포지션: 세션 오버라이드가 있으면 그 값을 우선 적용
@@ -1041,7 +1037,7 @@ const patchSession = (patch: Partial<Session>) => {
     if (players.some(p => p.name === nm)) return alert("이미 있는 이름입니다");
     setPlayers(prev => [...prev, { id: uid(), name: nm, active: true, pos: "필드" }].sort((a, b) => collate(a.name, b.name)));
   };
-  const updateTeamName = (tid: TeamId, nm: string) => patchSession({ teamNames: { ...(cur.teamNames || effectiveTeamNames), [tid]: nm } as any });
+  // 팀명은 조끼 색으로 고정 — updateTeamName 미사용
   const toggleRoster = (tid: TeamId, pid: string) => patchSession({
     rosters: (() => {
       const r = { ...(cur.rosters || { A: [], B: [], C: [] }) };
@@ -1183,7 +1179,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
 
   function calcScores(session: Session, dateKey?: string) {
     const out: Record<string, any> = {};
-    const teamNamesUse = TEAM_LABELS;
+    const teamNamesUse = TEAM_LABELS; // 팀명 항상 조끼 색 고정
 
     const teamOf = (pid: string): TeamId | "-" =>
       (session.rosters.A || []).includes(pid) ? "A" :
