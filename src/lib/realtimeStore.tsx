@@ -5,6 +5,7 @@ type Opts = {
   table?: string;
   id?: string;
   debounceMs?: number;
+  readonly?: boolean; // true면 Supabase에 절대 write하지 않음
 };
 
 /**
@@ -12,12 +13,14 @@ type Opts = {
  * - Reads once on mount
  * - Subscribes to realtime UPDATE/INSERT on the same row id
  * - Writes (UPSERT) with debounce whenever local state changes
+ *   → readonly=true 이면 write 완전 차단 (비인증 접속자 보호)
  * - Falls back gracefully if Supabase is misconfigured (console.warn only)
  */
 export function useRealtimeJsonState<T>(initial: T, opts: Opts = {}) {
   const table = opts.table ?? "futsal_state";
   const id = opts.id ?? "main";
   const debounceMs = opts.debounceMs ?? 500;
+  const readonly = opts.readonly ?? false;
 
   const [value, setValue] = useState<T>(initial);
   const [ready, setReady] = useState(false);
@@ -45,7 +48,7 @@ export function useRealtimeJsonState<T>(initial: T, opts: Opts = {}) {
       }
     }
     load();
-    return () => { cancelled = false; };
+    return () => { cancelled = true; };
   }, [table, id]);
 
   // Subscribe to realtime
@@ -70,9 +73,10 @@ export function useRealtimeJsonState<T>(initial: T, opts: Opts = {}) {
     };
   }, [table, id]);
 
-  // Debounced write on change
+  // Debounced write on change — readonly=true면 완전 차단
   useEffect(() => {
     if (!ready) return;
+    if (readonly) return;          // ← 비인증 상태면 upsert 절대 안 함
     if (skipNext.current) {
       skipNext.current = false;
       return;
@@ -91,7 +95,7 @@ export function useRealtimeJsonState<T>(initial: T, opts: Opts = {}) {
       }
     }, debounceMs);
     return () => { if (timer.current) window.clearTimeout(timer.current); };
-  }, [value, ready, table, id, debounceMs]);
+  }, [value, ready, readonly, table, id, debounceMs]);
 
   return { value, setValue, ready };
 }

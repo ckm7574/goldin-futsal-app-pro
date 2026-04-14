@@ -885,17 +885,15 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
   }, [players, collate]);
   const activePlayersSorted = useMemo(() => playersSorted.filter(p => p.active), [playersSorted]);
 
+  // authed를 useRealtimeJsonState 보다 먼저 선언 — readonly 여부를 훅에 전달하기 위해
+  const [authed, setAuthed] = useState<boolean>(() => sessionStorage.getItem(SS_PIN_AUTHED) === "1");
+  const readonly = !authed;
+
   const initialCloud = useMemo(() => ({ players, teamNames: globalTeamNames, sessionsByDate, sessionDate }), []);
   const { value: cloud, setValue: setCloud, ready } =
-    useRealtimeJsonState<typeof initialCloud>(initialCloud, { id: 1 } as any);
-useEffect(() => {
-  if (!ready || !cloud) return;
-  setPlayers(cloud.players);
-  setGlobalTeamNames(cloud.teamNames);
-  setSessionsByDate(cloud.sessionsByDate);
-  setSessionDate(ensureSunday(cloud.sessionDate));
-}, [ready, cloud]);
+    useRealtimeJsonState<typeof initialCloud>(initialCloud, { id: 1, readonly } as any);
 
+  // ── Realtime 수신 시 로컬 state 반영 (중복 제거: 이 하나만 유지)
   useEffect(() => {
     if (!ready || !cloud) return;
     const next = cloud;
@@ -905,21 +903,23 @@ useEffect(() => {
       setGlobalTeamNames(next.teamNames);
       setSessionsByDate(next.sessionsByDate);
       setSessionDate(ensureSunday(next.sessionDate));
-      setTimeout(() => { syncLockRef.current = false; hydratedRef.current = true; }, 50);
+      // 락 시간: Supabase 왕복(~300ms) + 안전 마진 = 1500ms
+      setTimeout(() => { syncLockRef.current = false; hydratedRef.current = true; }, 1500);
     } else {
       hydratedRef.current = true;
     }
   }, [cloud, ready]); // eslint-disable-line
 
+  // ── 로컬 state 변경 시 Supabase에 write (authed일 때만)
   useEffect(() => {
     const s = { players, teamNames: globalTeamNames, sessionsByDate, sessionDate: ensureSunday(sessionDate) };
     saveLocal(s);
-    if (!ready || !hydratedRef.current || syncLockRef.current) return;
+    if (!authed || !ready || !hydratedRef.current || syncLockRef.current) return;
     if (debTimerRef.current) clearTimeout(debTimerRef.current);
     debTimerRef.current = setTimeout(() => {
       if (JSON.stringify(pickState(cloud)) !== JSON.stringify(pickState(s))) setCloud(s);
-    }, 150);
-  }, [players, globalTeamNames, sessionsByDate, sessionDate, ready]); // eslint-disable-line
+    }, 500);
+  }, [players, globalTeamNames, sessionsByDate, sessionDate, ready, authed]); // eslint-disable-line
 
   useEffect(() => {
     const key = ensureSunday(sessionDate);
@@ -971,8 +971,7 @@ useEffect(() => {
   }, [players, sessionsByDate, sessionDate]);
 
   const viewerFlag = getQueryFlag("viewer", "view", "readonly");
-  const [authed, setAuthed] = useState<boolean>(() => sessionStorage.getItem(SS_PIN_AUTHED) === "1");
-  const readonly = !authed;
+  // authed / readonly 는 위(useRealtimeJsonState 앞)에서 이미 선언됨
   const [pinInput, setPinInput] = useState("");
 
   async function sha256Hex(input: string): Promise<string> {
