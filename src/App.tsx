@@ -1,28 +1,27 @@
-
-function getActiveTeamsSafe(maybeCur?: any): TeamId[] {
-  const enabled = !!(maybeCur && typeof maybeCur === "object" && "hasTeamD" in maybeCur && maybeCur.hasTeamD);
-  return getActiveTeams(enabled);
-}
 /* App.tsx — 팀별 조끼 색 포메이션 미리보기 + 랭킹 보드 개선 포함 */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRealtimeJsonState } from "./lib/realtimeStore";
 import FifaSection from "./components/FifaSection.supabase";
-
-// ---- Uniform SVG icon (round neck) ----
-    const UniformIcon: React.FC<{ fill: string; size: number; stroke?: string }> = ({ fill, size, stroke = "#111" }) => (
-      <svg viewBox="0 0 100 100" x={-(size*1.25)/2} y={-(size)/2} width={size * 1.25} height={size} aria-hidden>
-        <path d="M8 26 L28 12 L42 20 L58 20 L72 12 L92 26 L84 38 L72 32 L72 90 L28 90 L28 32 L16 38 Z"
-              fill={fill} stroke={stroke} strokeWidth="2" />
-        <circle cx="50" cy="22" r="6" fill="#111" />
-      </svg>
-    );
-const tail3 = (name: string) => name.slice(Math.max(0, name.length - 3));
-
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   LineChart, Line, CartesianGrid
 } from "recharts";
+
+// ---- Uniform SVG icon (round neck) ----
+const UniformIcon: React.FC<{ fill: string; size: number; stroke?: string }> = ({ fill, size, stroke = "#111" }) => (
+  <svg viewBox="0 0 100 100" x={-(size*1.25)/2} y={-(size)/2} width={size * 1.25} height={size} aria-hidden>
+    <path d="M8 26 L28 12 L42 20 L58 20 L72 12 L92 26 L84 38 L72 32 L72 90 L28 90 L28 32 L16 38 Z"
+          fill={fill} stroke={stroke} strokeWidth="2" />
+    <circle cx="50" cy="22" r="6" fill="#111" />
+  </svg>
+);
+const tail3 = (name: string) => name.slice(Math.max(0, name.length - 3));
+
+function getActiveTeamsSafe(maybeCur?: any): TeamId[] {
+  const enabled = !!(maybeCur && typeof maybeCur === "object" && "hasTeamD" in maybeCur && maybeCur.hasTeamD);
+  return getActiveTeams(enabled);
+}
 
 /* ====== 공통 타입/유틸 ====== */
 const TEAM_IDS = ["A","B","C","D"] as const;
@@ -32,7 +31,7 @@ function getActiveTeams(hasTeamD: boolean): TeamId[] {
 }
 
 type TeamId = typeof TEAM_IDS[number];
-type FormationKey = "1-2-1" | "2-2" | "3-1" | "2-2-2";
+type FormationKey = "1-2-1" | "2-2" | "3-1" | "2-2-1" | "2-2-2";
 
 type Player = { id: string; name: string; active: boolean; pos: "필드" | "GK" };
 type Match = {
@@ -169,16 +168,6 @@ async function loadPersistFromSupabase(): Promise<AppPersist | null> {
     const sb = await loadSupabaseClient(); if (!sb) return null;
     const { data, error } = await sb.from("app_state").select("state").eq("id", APP_STATE_ID).maybeSingle();
     if (error) return null;
-// Upload changes only when authed (debounced)
-useEffect(() => {
-  if (!authed) return;
-  const nextState = { players, teamNames: globalTeamNames, sessionsByDate, sessionDate };
-  if (debTimerRef.current) clearTimeout(debTimerRef.current);
-  debTimerRef.current = setTimeout(async () => {
-    await savePersistToSupabase(nextState);
-    if (typeof setCloud === 'function') setCloud(nextState);
-  }, 500);
-}, [authed, players, globalTeamNames, sessionsByDate, sessionDate]);
     return (data?.state as AppPersist) ?? null;
   } catch { return null; }
 }
@@ -404,17 +393,24 @@ function normalizeLoaded(data: any): PersistShape {
       
       const hasTeamD: boolean = Boolean(s?.hasTeamD);
 const teamNames = (s?.teamNames && typeof s.teamNames === "object")
-        ? ({ A: String(s.teamNames.A || globalTeamNames.A), B: String(s.teamNames.B || globalTeamNames.B), C: String(s.teamNames.C || globalTeamNames.C) })
+        ? ({
+            A: String(s.teamNames.A || globalTeamNames.A),
+            B: String(s.teamNames.B || globalTeamNames.B),
+            C: String(s.teamNames.C || globalTeamNames.C),
+            D: String(s.teamNames.D || globalTeamNames.D)
+          })
         : undefined;
       const rosterViewConfirmed: Record<TeamId, boolean> = {
         A: Boolean(s?.rosterViewConfirmed?.A),
         B: Boolean(s?.rosterViewConfirmed?.B),
         C: Boolean(s?.rosterViewConfirmed?.C),
+        D: Boolean(s?.rosterViewConfirmed?.D),
       };
       const formations: Record<TeamId, FormationKey> = {
         A: (s?.formations?.A as FormationKey) || "1-2-1",
         B: (s?.formations?.B as FormationKey) || "1-2-1",
         C: (s?.formations?.C as FormationKey) || "1-2-1",
+        D: (s?.formations?.D as FormationKey) || "1-2-1",
       };
 
       const posOverrides: Record<string, Player["pos"]> = {};
@@ -436,8 +432,8 @@ const teamNames = (s?.teamNames && typeof s.teamNames === "object")
   Object.values(sessionsByDate).forEach(sess => {
     const list = asArray(sess.matches, []);
     let seq = 1; for (const m of list) { if (!m.seq || m.seq <= 0) m.seq = seq; seq++; }
-    if (!sess.rosterViewConfirmed) sess.rosterViewConfirmed = { A: false, B: false, C: false };
-    if (!sess.formations) sess.formations = { A: "1-2-1", B: "1-2-1", C: "1-2-1" };
+    if (!sess.rosterViewConfirmed) sess.rosterViewConfirmed = { A: false, B: false, C: false, D: false };
+    if (!sess.formations) sess.formations = { A: "1-2-1", B: "1-2-1", C: "1-2-1", D: "1-2-1" };
     if (!sess.posOverrides) sess.posOverrides = {};
   });
 
@@ -533,18 +529,19 @@ const FORMATION_POINTS: Record<FormationKey, { x: number; y: number; label: stri
     { x: 20, y: 90, label: "DF" }, { x: 50, y: 90, label: "DF" }, { x: 80, y: 90, label: "DF" },
     { x: 50, y: 50, label: "FW" },
   ],
-    "2-2-2": [
+  "2-2-1": [
+    { x: 50, y: 92, label: "GK" },
+    { x: 30, y: 100, label: "DF" }, { x: 70, y: 100, label: "DF" },
+    { x: 30, y: 70, label: "MF" }, { x: 70, y: 70, label: "MF" },
+    { x: 50, y: 40, label: "FW" },
+  ],
+  "2-2-2": [
     { x: 50, y: 92, label: "GK" },
     { x: 30, y: 100, label: "DF" }, { x: 70, y: 100, label: "DF" },
     { x: 30, y: 70, label: "MF" }, { x: 70, y: 70, label: "MF" },
     { x: 30, y: 40, label: "FW" }, { x: 70, y: 40, label: "FW" },
   ],
-"2-2-1": [
-  { x: 50, y: 92, label: "GK" },
-  { x: 30, y: 100, label: "DF" }, { x: 70, y: 100, label: "DF" },
-  { x: 30, y: 70, label: "MF" }, { x: 70, y: 70, label: "MF" },
-  { x: 50, y: 40, label: "FW" },
-]};
+};
 
 function initials(name: string) {
   const t = name.trim();
@@ -623,13 +620,14 @@ function FormationPreview({
 
 /* ====== MatchRow (기존) ====== */
 function MatchRow({
-  m, readonly, updateMatch, deleteMatch, rosterA, rosterB, players, values, onChange, teamNames, posOf
+  m, readonly, updateMatch, deleteMatch, rosterA, rosterB, players, values, onChange, teamNames, posOf, activeTeams
 }: {
   m: Match; readonly: boolean; updateMatch: (id: string, patch: Partial<Match>, opts?: { reevalGK?: boolean }) => void; deleteMatch: (id: string) => void;
   rosterA: string[]; rosterB: string[]; players: Player[]; values: MatchStats;
   onChange: (pid: string, field: "goals" | "assists", value: number) => void;
   teamNames: Record<TeamId, string>;
   posOf: (pid: string) => Player["pos"];
+  activeTeams: TeamId[];
 }) {
   const [open, setOpen] = useState(false);
   const collate = useMemo(() => new Intl.Collator("ko-KR", { sensitivity: "base", numeric: true, ignorePunctuation: true }).compare, []);
@@ -655,7 +653,7 @@ function MatchRow({
         <div className="scoreline">
           <TeamPicker
             value={m.home}
-            teams={getActiveTeamsSafe(typeof cur !== "undefined" ? cur : undefined)}
+            teams={activeTeams}
             disabled={readonly}
             onChange={(v) => updateMatch(m.id, { home: v }, { reevalGK: true })}
           />
@@ -682,7 +680,7 @@ function MatchRow({
 
           <TeamPicker
             value={m.away}
-            teams={getActiveTeamsSafe(typeof cur !== "undefined" ? cur : undefined)}
+            teams={activeTeams}
             disabled={readonly}
             onChange={(v) => updateMatch(m.id, { away: v }, { reevalGK: true })}
           />
@@ -995,7 +993,12 @@ useEffect(() => {
   function copyViewerLink() { const url = new URL(window.location.href); url.searchParams.set("viewer", "1"); navigator.clipboard?.writeText(url.toString()); alert("보기 전용 링크가 복사되었습니다"); }
 
   const cur: Session = useMemo(() => sessionsByDate[ensureSunday(sessionDate)] ?? emptySession(), [sessionsByDate, sessionDate]);
-  const effectiveTeamNames: Record<TeamId, string> = TEAM_LABELS;
+  const effectiveTeamNames: Record<TeamId, string> = useMemo(() => ({
+    A: cur.teamNames?.A || globalTeamNames.A || TEAM_LABELS.A,
+    B: cur.teamNames?.B || globalTeamNames.B || TEAM_LABELS.B,
+    C: cur.teamNames?.C || globalTeamNames.C || TEAM_LABELS.C,
+    D: cur.teamNames?.D || globalTeamNames.D || TEAM_LABELS.D,
+  }), [cur.teamNames, globalTeamNames]);
 
   
   // 날짜별(세션별) 포지션: 세션 오버라이드가 있으면 그 값을 우선 적용
@@ -1626,21 +1629,18 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
         <>
           <section className="box">
             <h3>팀 구성</h3>
-            {!(typeof cur !== "undefined" ? (cur as any)?.hasTeamD : false) && (
+            {!cur?.hasTeamD && (
               <button className="btn add-team" onClick={() => {
-                setState(prev => {
-                  const s = { ...prev } as any;
-                  const key = sessionDate;
-                  const base = s.sessionsByDate[key] || emptySession();
-                  // mark team D enabled
+                if (readonly) return;
+                const key = ensureSunday(sessionDate);
+                setSessionsByDate(prev => {
+                  const base = { ...(prev[key] ?? emptySession()) };
                   base.hasTeamD = true;
-                  // ensure structures for D
                   base.rosters = { ...base.rosters, D: base.rosters?.D || [] };
                   base.defAwards = { ...base.defAwards, D: base.defAwards?.D || null };
                   base.rosterViewConfirmed = { ...base.rosterViewConfirmed, D: false };
-                  base.formations = { ...base.formations, D: "1-2-1" };
-                  s.sessionsByDate[key] = base;
-                  return s;
+                  base.formations = { ...base.formations, D: base.formations?.D || "1-2-1" };
+                  return { ...prev, [key]: base };
                 });
               }}>+ 팀 추가</button>
             )}
@@ -1676,7 +1676,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                         <option value="2-2-1">2-2-1</option>
                         <option value="2-2-2">2-2-2</option>
                       </select>
-                      <span className="hint">조끼색: {TEAM_PINNIES[tid] === "red" ? "빨강" : TEAM_PINNIES[tid] === "yellow" ? "노랑" : "초록"}</span>
+                      <span className="hint">조끼색: {TEAM_PINNIES[tid] === "red" ? "빨강" : TEAM_PINNIES[tid] === "yellow" ? "노랑" : TEAM_PINNIES[tid] === "green" ? "초록" : "흰색"}</span>
                     </div>
 
                     <div className="list-scroll small">
@@ -1787,7 +1787,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                 <MatchRow key={m.id} m={m} readonly={readonly} updateMatch={updateMatch} deleteMatch={deleteMatch}
                   rosterA={asArray(cur.rosters[m.home], [])} rosterB={asArray(cur.rosters[m.away], [])} players={players}
                   values={cur.matchStats?.[m.id] || {}} onChange={(pid, field, val) => setMatchStat(m.id, pid, field, val)} teamNames={effectiveTeamNames}
-                  posOf={(pid) => posOf(pid, cur)} />
+                  posOf={(pid) => posOf(pid, cur)} activeTeams={getActiveTeamsSafe(cur)} />
               ))}
             </div>
 
@@ -2023,10 +2023,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
 
               <div style={{ flex: "1 1 360px", minWidth: 320 }}>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={Object.entries(sessionsByDate).sort(([a],[b])=>a.localeCompare(b)).map(([dateKey, s])=>{
-                    const sc = calcScores(s, dateKey); const row = sc[selectedPlayerId!] || { total: 0 };
-                    return { date: dateKey.slice(5), total: row.total };
-                  })}>
+                  <LineChart data={sparklineData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#23252B" />
                     <XAxis dataKey="date" stroke="#EAEAEA" />
                     <YAxis stroke="#EAEAEA" />
