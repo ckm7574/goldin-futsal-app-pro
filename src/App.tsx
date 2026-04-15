@@ -1261,7 +1261,11 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
       }
     });
 
-    TEAM_IDS.forEach(tid => asArray(session.rosters[tid], []).forEach(pid => { if (!out[pid]) out[pid] = { goals: 0, assists: 0, cleansheets: 0 }; }));
+    // 경기가 실제로 있었던 날만 로스터 선수를 집계에 포함
+    // (경기 없이 명단만 짜놓은 날은 점수/days 모두 카운트하지 않음)
+    if (hasMatches) {
+      TEAM_IDS.forEach(tid => asArray(session.rosters[tid], []).forEach(pid => { if (!out[pid]) out[pid] = { goals: 0, assists: 0, cleansheets: 0 }; }));
+    }
 
     const collator = new Intl.Collator("ko-KR", { sensitivity: "base", numeric: true });
     Object.keys(out).forEach(pid => {
@@ -1405,6 +1409,9 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
   const cumulativeScores = useMemo(() => {
     const agg: Record<string, any> = {};
     Object.entries(sessionsByDate).forEach(([dateKey, s]) => {
+      // 경기가 없는 날(미리 명단만 짠 날)은 집계에서 완전 제외
+      const hasMatches = Array.isArray(s.matches) && s.matches.length > 0;
+      if (!hasMatches) return;
       const sc = calcScores(s, dateKey);
       const present = new Set<string>();
       TEAM_IDS.forEach(t => asArray(s.rosters[t], []).forEach(pid => present.add(pid)));
@@ -1435,6 +1442,9 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
   const cumulativeScoresFiltered = useMemo(() => {
     const agg: Record<string, any> = {};
     filteredSessionEntries.forEach(([dateKey, s]) => {
+      // 경기가 없는 날(미리 명단만 짠 날)은 집계에서 완전 제외
+      const hasMatches = Array.isArray(s.matches) && s.matches.length > 0;
+      if (!hasMatches) return;
       const sc = calcScores(s, dateKey);
       const present = new Set<string>();
       TEAM_IDS.forEach(t => asArray(s.rosters[t], []).forEach(pid => present.add(pid)));
