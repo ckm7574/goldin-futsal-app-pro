@@ -792,7 +792,7 @@ function MatchRow({
 
 /* ====== 시즌 구분 (컴포넌트 밖) ====== */
 const HALF_CUTOFFS: Record<number, string> = {
-  2026: "2026-06-07", // 2026년: 6/7 까지 상반기, 6/14 부터 하반기
+  2026: "2026-06-13", // 2026년: 6/14 부터 하반기
 };
 
 function seasonIdFromISO(iso: string): string {
