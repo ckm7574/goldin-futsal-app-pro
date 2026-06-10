@@ -430,7 +430,7 @@ const teamNames = (s?.teamNames && typeof s.teamNames === "object")
   if (!sessionsByDate[sessionDate]) sessionsByDate[sessionDate] = emptySession();
 
   Object.values(sessionsByDate).forEach(sess => {
-    const list = asArray(sess.matches, []);
+    const list = asArray<Match>(sess.matches, []);
     let seq = 1; for (const m of list) { if (!m.seq || m.seq <= 0) m.seq = seq; seq++; }
     if (!sess.rosterViewConfirmed) sess.rosterViewConfirmed = { A: false, B: false, C: false, D: false };
     if (!sess.formations) sess.formations = { A: "1-2-1", B: "1-2-1", C: "1-2-1", D: "1-2-1" };
@@ -944,7 +944,7 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
         if (tn && tn.A && tn.B && tn.C) { donor = tn as any; break; }
       }
       const useTN = donor || globalTeamNames;
-      return { ...prev, [key]: { ...base, teamNames: { A: useTN.A, B: useTN.B, C: useTN.C } } };
+      return { ...prev, [key]: { ...base, teamNames: { A: useTN.A, B: useTN.B, C: useTN.C, D: useTN.D || globalTeamNames.D } } };
     });
   }, [sessionDate]); // eslint-disable-line
 
@@ -952,7 +952,7 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
     const key = ensureSunday(sessionDate);
     setSessionsByDate(prev => {
       const base = prev[key] ?? emptySession();
-      const matches = asArray(base.matches, []);
+      const matches = asArray<Match>(base.matches, []);
       let changed = false;
 
       const pickOneGK = (tid: TeamId): string | null => {
@@ -1043,37 +1043,37 @@ const patchSession = (patch: Partial<Session>) => {
     if (readonly) return;
     const nm = name.trim(); if (!nm) return;
     if (players.some(p => p.name === nm)) return alert("이미 있는 이름입니다");
-    setPlayers(prev => [...prev, { id: uid(), name: nm, active: true, pos: "필드" }].sort((a, b) => collate(a.name, b.name)));
+    setPlayers(prev => [...prev, { id: uid(), name: nm, active: true, pos: "필드" as Player["pos"] }].sort((a, b) => collate(a.name, b.name)));
   };
   // 팀명은 조끼 색으로 고정 — updateTeamName 미사용
   const toggleRoster = (tid: TeamId, pid: string) => patchSession({
     rosters: (() => {
-      const r = { ...(cur.rosters || { A: [], B: [], C: [] }) };
-      const list = asArray(r[tid], []);
-      r[tid] = list.includes(pid) ? list.filter(id => id !== pid) : [...list, pid];
+      const r = { ...(cur.rosters || { A: [], B: [], C: [], D: [] }) } as Record<TeamId, string[]>;
+      const list = asArray<string>(r[tid], []);
+      r[tid] = list.includes(pid) ? list.filter((id: string) => id !== pid) : [...list, pid];
       return r;
     })(),
     posOverrides: (() => {
       const po = { ...(cur.posOverrides || {}) } as Record<string, Player["pos"]>;
       // 팀에서 빠지면 해당 일자 포지션 오버라이드도 제거
-      const list = asArray(cur.rosters?.[tid], []);
+      const list = asArray<string>((cur.rosters as Record<TeamId, string[]>)?.[tid], []);
       if (list.includes(pid)) delete po[pid];
       return po;
     })()
   });
   const setFormation = (tid: TeamId, f: FormationKey) =>
-    patchSession({ formations: { ...(cur.formations || { A: "1-2-1", B: "1-2-1", C: "1-2-1" }), [tid]: f } });
+    patchSession({ formations: { ...(cur.formations || { A: "1-2-1", B: "1-2-1", C: "1-2-1", D: "1-2-1" }), [tid]: f } });
 
   const toggleConfirmTeamView = (tid: TeamId) => {
     if (readonly) return;
     const curr = cur.rosterViewConfirmed?.[tid] ?? false;
-    patchSession({ rosterViewConfirmed: { ...(cur.rosterViewConfirmed || { A: false, B: false, C: false }), [tid]: !curr } });
+    patchSession({ rosterViewConfirmed: { ...(cur.rosterViewConfirmed || { A: false, B: false, C: false, D: false }), [tid]: !curr } });
   };
 
   const updateMatch = (id: string, patch: Partial<Match>, opts?: { reevalGK?: boolean }) => {
     if (readonly) return;
     patchSession({
-      matches: asArray(cur.matches, []).map(m => {
+      matches: asArray<Match>(cur.matches, []).map(m => {
         if (m.id !== id) return m;
 
         const teamChangedHome = Object.prototype.hasOwnProperty.call(patch, "home");
@@ -1086,14 +1086,14 @@ const patchSession = (patch: Partial<Session>) => {
         let nextGKAway = (Object.prototype.hasOwnProperty.call(patch, "gkAway") ? (patch.gkAway ?? null) : m.gkAway ?? null);
 
         const pickOneGK = (tid: TeamId): string | null => {
-          const ids = asArray(cur.rosters[tid], []);
+          const ids = asArray<string>((cur.rosters as Record<TeamId, string[]>)[tid], []);
           const gkIds = ids.filter(pid => posOf(pid, cur) === "GK");
           return gkIds.length === 1 ? gkIds[0] : null;
         };
 
         if (opts?.reevalGK && teamChangedHome && nextGKHome !== "") {
           const auto = pickOneGK(nextHome);
-          const rosterHome = asArray(cur.rosters[nextHome], []);
+          const rosterHome = asArray<string>((cur.rosters as Record<TeamId, string[]>)[nextHome], []);
           const isCurrentValid = nextGKHome ? rosterHome.includes(nextGKHome) && (posOf(nextGKHome, cur) === "GK") : false;
           if (auto) nextGKHome = auto;
           else if (!isCurrentValid) nextGKHome = null;
@@ -1101,7 +1101,7 @@ const patchSession = (patch: Partial<Session>) => {
 
         if (opts?.reevalGK && teamChangedAway && nextGKAway !== "") {
           const auto = pickOneGK(nextAway);
-          const rosterAway = asArray(cur.rosters[nextAway], []);
+          const rosterAway = asArray<string>((cur.rosters as Record<TeamId, string[]>)[nextAway], []);
           const isCurrentValid = nextGKAway ? rosterAway.includes(nextGKAway) && (posOf(nextGKAway, cur) === "GK") : false;
           if (auto) nextGKAway = auto;
           else if (!isCurrentValid) nextGKAway = null;
@@ -1113,7 +1113,7 @@ const patchSession = (patch: Partial<Session>) => {
   };
 
   const addMatch = () => {
-    let maxSeq = 0; asArray(cur.matches, []).forEach(m => { if (m.seq && m.seq > maxSeq) maxSeq = m.seq; });
+    let maxSeq = 0; asArray<Match>(cur.matches, []).forEach(m => { if (m.seq && m.seq > maxSeq) maxSeq = m.seq; });
     const nextSeq = maxSeq + 1;
 
     let home: TeamId = "A";
@@ -1121,17 +1121,17 @@ const patchSession = (patch: Partial<Session>) => {
 
     if (nextSeq >= 4 && nextSeq <= 9) {
       const baseSeq: number = ((nextSeq - 1) % 3) + 1;
-      const baseMatch = asArray(cur.matches, []).find(m => m.seq === baseSeq);
+      const baseMatch = asArray<Match>(cur.matches, []).find(m => m.seq === baseSeq);
       if (baseMatch) {
         home = baseMatch.home;
         away = baseMatch.away;
       }
     }
 
-    patchSession({ matches: [...asArray(cur.matches, []), { id: uid(), seq: nextSeq, home, away, hg: 0, ag: 0, gkHome: null, gkAway: null }] });
+    patchSession({ matches: [...asArray<Match>(cur.matches, []), { id: uid(), seq: nextSeq, home, away, hg: 0, ag: 0, gkHome: null, gkAway: null }] });
   };
 
-  const deleteMatch = (id: string) => patchSession({ matches: asArray(cur.matches, []).filter(m => m.id !== id) });
+  const deleteMatch = (id: string) => patchSession({ matches: asArray<Match>(cur.matches, []).filter(m => m.id !== id) });
   const getDefAwardArray = (val: any): string[] => {
   if (Array.isArray(val)) return val.filter(Boolean);
   if (typeof val === "string" && val) return [val];
@@ -1231,7 +1231,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
     const hasMatches = Array.isArray(session.matches) && session.matches.length > 0;
 
     const gkWins: Record<string, number> = {};
-    asArray(session.matches, []).forEach(m => {
+    asArray<Match>(session.matches, []).forEach(m => {
       const hg = asNumber(m.hg, 0), ag = asNumber(m.ag, 0);
       if (hg > ag && m.gkHome) { const gid = resolvePid(String(m.gkHome)) || String(m.gkHome); gkWins[gid] = (gkWins[gid] || 0) + 1; }
       if (ag > hg && m.gkAway) { const gid = resolvePid(String(m.gkAway)) || String(m.gkAway); gkWins[gid] = (gkWins[gid] || 0) + 1; }
@@ -1239,14 +1239,14 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
 
     const teamGKs: Record<TeamId, string[]> = { A: [], B: [], C: [], D: [] };
     TEAM_IDS.forEach(tid => {
-      teamGKs[tid] = asArray(session.rosters[tid], []).filter(pid => {
+      teamGKs[tid] = asArray<string>((session.rosters as Record<TeamId, string[]>)[tid], []).filter(pid => {
         const ov = session?.posOverrides?.[pid];
         const eff = (ov === "GK" || ov === "필드") ? ov : (players.find(p => p.id === pid)?.pos || "필드");
         return eff === "GK";
       });
     });
 
-    asArray(session.matches, []).forEach(m => {
+    asArray<Match>(session.matches, []).forEach(m => {
       const ms = session.matchStats?.[m.id] || {};
       Object.entries(ms).forEach(([pidKey, s]) => {
         const pid = resolvePid(pidKey);
@@ -1273,7 +1273,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
     // 경기가 실제로 있었던 날만 로스터 선수를 집계에 포함
     // (경기 없이 명단만 짜놓은 날은 점수/days 모두 카운트하지 않음)
     if (hasMatches) {
-      TEAM_IDS.forEach(tid => asArray(session.rosters[tid], []).forEach(pid => { if (!out[pid]) out[pid] = { goals: 0, assists: 0, cleansheets: 0 }; }));
+      TEAM_IDS.forEach(tid => asArray<string>((session.rosters as Record<TeamId, string[]>)[tid], []).forEach(pid => { if (!out[pid]) out[pid] = { goals: 0, assists: 0, cleansheets: 0 }; }));
     }
 
     const collator = new Intl.Collator("ko-KR", { sensitivity: "base", numeric: true });
@@ -1494,7 +1494,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
   }, [sortedCumulativeFiltered, overallSortKey, overallSortDir, collate]);
 
 
-  const matchesSorted = useMemo(() => [...asArray(cur.matches, [])].sort((a, b) => (b.seq || 0) - (a.seq || 0)), [cur.matches]);
+  const matchesSorted = useMemo(() => [...asArray<Match>(cur.matches, [])].sort((a, b) => (b.seq || 0) - (a.seq || 0)), [cur.matches]);
 
   function top5RankingFrom(baseList: any[], type: "goals" | "assists" | "def" | "cleansheets" | "teamBonus" | "total") {
     let sorted = [...baseList];
@@ -1652,8 +1652,8 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                   base.hasTeamD = true;
                   base.rosters = { ...base.rosters, D: base.rosters?.D || [] };
                   base.defAwards = { ...base.defAwards, D: base.defAwards?.D || null };
-                  base.rosterViewConfirmed = { ...base.rosterViewConfirmed, D: false };
-                  base.formations = { ...base.formations, D: base.formations?.D || "1-2-1" };
+                  base.rosterViewConfirmed = { A: base.rosterViewConfirmed?.A ?? false, B: base.rosterViewConfirmed?.B ?? false, C: base.rosterViewConfirmed?.C ?? false, D: false } as Record<TeamId, boolean>;
+                  base.formations = { A: base.formations?.A ?? "1-2-1", B: base.formations?.B ?? "1-2-1", C: base.formations?.C ?? "1-2-1", D: base.formations?.D ?? "1-2-1" } as Record<TeamId, FormationKey>;
                   return { ...prev, [key]: base };
                 });
               }}>+ 팀 추가</button>
@@ -1662,10 +1662,10 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
               {getActiveTeamsSafe(typeof cur !== "undefined" ? cur : undefined).map(tid => {
                 const isConfirmed = Boolean(cur.rosterViewConfirmed?.[tid]);
                 const sourceList = isConfirmed
-                  ? activePlayersSorted.filter(p => asArray(cur.rosters[tid], []).includes(p.id))
+                  ? activePlayersSorted.filter(p => asArray<string>((cur.rosters as Record<TeamId, string[]>)[tid], []).includes(p.id))
                   : activePlayersSorted;
                 const requested = (cur.formations?.[tid] as FormationKey) || null;
-                const currentRoster = asArray(cur.rosters?.[tid], []);
+                const currentRoster = asArray<string>((cur.rosters as Record<TeamId, string[]>)?.[tid], []);
                 const fieldCount = currentRoster.filter(pid => posOf(pid) !== "GK").length;
                 const byCount = (fieldCount >= 5 ? "2-2-1" : (fieldCount === 4 ? "1-2-1" : (fieldCount === 3 ? "1-2" : "1-2-1"))) as FormationKey;
                 const formation = ((requested ?? byCount) as FormationKey);
@@ -1698,13 +1698,13 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                         <label key={p.id} className="checkline">
                           <input
                             type="checkbox"
-                            checked={asArray(cur.rosters[tid], []).includes(p.id)}
+                            checked={asArray<string>((cur.rosters as Record<TeamId, string[]>)[tid], []).includes(p.id)}
                             onChange={() => toggleRoster(tid, p.id)}
                             disabled={readonly}
                           />
                           {p.name} {(posOf(p.id) === "GK") && <span className="badge-gk">GK</span>}
                           {/* 날짜별 포지션 변경: GK → 필드 (해당 일자에만 적용) */}
-                          {asArray(cur.rosters[tid], []).includes(p.id) && (players.find(x => x.id === p.id)?.pos === "GK") && (
+                          {asArray<string>((cur.rosters as Record<TeamId, string[]>)[tid], []).includes(p.id) && (players.find(x => x.id === p.id)?.pos === "GK") && (
                             <select
                               className="mini-select"
                               value={posOf(p.id)}
@@ -1799,7 +1799,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
             <div className="match-list">
               {matchesSorted.map(m => (
                 <MatchRow key={m.id} m={m} readonly={readonly} updateMatch={updateMatch} deleteMatch={deleteMatch}
-                  rosterA={asArray(cur.rosters[m.home], [])} rosterB={asArray(cur.rosters[m.away], [])} players={players}
+                  rosterA={asArray<string>((cur.rosters as Record<TeamId, string[]>)[m.home], [])} rosterB={asArray<string>((cur.rosters as Record<TeamId, string[]>)[m.away], [])} players={players}
                   values={cur.matchStats?.[m.id] || {}} onChange={(pid, field, val) => setMatchStat(m.id, pid, field, val)} teamNames={effectiveTeamNames}
                   posOf={(pid) => posOf(pid, cur)} activeTeams={getActiveTeamsSafe(cur)} />
               ))}
