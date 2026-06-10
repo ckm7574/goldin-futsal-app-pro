@@ -848,9 +848,8 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
   type StatsFilterMode = "all" | "season" | "range";
 
   const getCurrentSeasonId = (d: Date = new Date()): string => {
-    const y = d.getFullYear();
-    const m = d.getMonth() + 1; // 1-12
-    return m <= 6 ? `${y}-1` : `${y}-2`;
+    const iso = toISO(d);
+    return seasonIdFromISO(iso);
   };
 
   // 새로 접속/새로고침 시에는 항상 "현재 시즌"이 기본값(= 상태를 별도 저장/복원하지 않음)
@@ -865,10 +864,20 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
   const [overallSortDir, setOverallSortDir] = useState<"desc" | "asc">("desc");
 
   const seasonIdFromISO = (iso: string): string => {
-    // iso: YYYY-MM-DD
+    // 상반기/하반기 커트 날짜 기준으로 시즌 구분
+    // 각 연도별 커트 날짜(해당 날짜 포함 이전 = 상반기, 이후 = 하반기)
+    // 기본값: 6/7 이하 = 상반기(yyyy-1), 6/14 이상 = 하반기(yyyy-2)
+    const HALF_CUTOFFS: Record<number, string> = {
+      2026: "2026-06-07", // 2026년: 6/7 까지 상반기, 6/14 부터 하반기
+    };
     const y = Number(String(iso).slice(0, 4));
+    if (!Number.isFinite(y) || y < 2000) return "";
+    const cutoff = HALF_CUTOFFS[y];
+    if (cutoff) {
+      return iso <= cutoff ? `${y}-1` : `${y}-2`;
+    }
+    // 커트 날짜 미지정 연도는 기존 방식(6월 이하 = 상반기)
     const m = Number(String(iso).slice(5, 7));
-    if (!Number.isFinite(y) || !Number.isFinite(m)) return "";
     return m <= 6 ? `${y}-1` : `${y}-2`;
   };
 
