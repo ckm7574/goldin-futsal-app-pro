@@ -644,7 +644,7 @@ function FormationPreview({
           x={0} y={NAME_Y}
           dominantBaseline="middle" textAnchor="middle"
           fill="white"
-          fontSize="9" fontWeight="800"
+          fontSize="10" fontWeight="800"
           stroke="black" strokeWidth="2"
           paintOrder="stroke"
           style={{ fontFamily: "inherit" }}
