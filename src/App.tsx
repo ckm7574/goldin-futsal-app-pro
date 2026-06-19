@@ -584,59 +584,67 @@ function FormationPreview({
     color === "yellow" ? "var(--jersey-yellow)" :
     color === "green"  ? "var(--jersey-green)"  : "var(--jersey-white)";
 
-  // ── 치수 (viewBox 200×280 단위) ──────────────────
-  // 유니폼 SVG 렌더 크기
-  const UH = 38;   // UniformIcon size
-  // 사진: 유니폼 위에 겨드랑이까지 덮도록
-  // UniformIcon: viewBox 0 0 100 100, 몸통은 y=12~90, 어깨는 x=28~72
-  // size=UH 기준: y=-(UH/2) ~ +(UH/2), 넥 y≈-UH*0.28, 겨드랑이 y≈+UH*0.10
-  const PW = UH * 1.1;          // 사진 너비 (유니폼 어깨폭과 맞춤)
-  const PH = UH * 1.05;         // 사진 높이 (얼굴~겨드랑이)
-  const PX = -PW / 2;           // 사진 x 시작
-  const PY = -UH * 0.60;        // 사진 y 시작 (머리 위부터)
-  // 겨드랑이 라인: UniformIcon에서 y≈+UH*0.10 위치
-  const ARMPIT_Y = UH * 0.10;   // 이 y까지만 사진 보이게 clip
+  // ── UniformIcon 치수 분석 (viewBox 0 0 100 100, size=UH) ──
+  // SVG 내부 좌표 → 렌더 좌표 변환: renderY = (svgY/100 - 0.5) * UH
+  // 목(neck)  svgY≈22  → renderY = (22/100 - 0.5)*UH = -0.28*UH
+  // 겨드랑이  svgY≈57  → renderY = (57/100 - 0.5)*UH = +0.07*UH
+  // 유니폼 하단 svgY≈90 → renderY = (90/100 - 0.5)*UH = +0.40*UH
+  const UH = 46;                   // 유니폼 렌더 높이
+  const NECK_Y   = -0.28 * UH;    // 목 위치 y
+  const ARMPIT_Y =  0.07 * UH;    // 겨드랑이 위치 y
+
+  // 유니폼 clip: 상단(목)부터 겨드랑이까지만
+  const jerseyClipId = `jersey-clip-${color}`;
+
+  // 사진: 넥 바로 위에 하단이 딱 붙도록, 크기 3배(원래 PW=UH*1.1 → 3배)
+  const PW = UH * 3.3;            // 사진 너비 (3배)
+  const PH = UH * 3.3;            // 사진 높이 (3배, 정사각 비율)
+  const PX = -PW / 2;
+  const PY = NECK_Y - PH;         // 사진 하단이 넥에 딱 붙음
 
   const PlayerNode = ({ pid, cx, cy, isGK = false }: { pid: string | null; cx: number; cy: number; isGK?: boolean }) => {
     const player = pid ? players.find(p => p.id === pid) : null;
     const name   = player?.name || "";
     const photo  = player?.photo || null;
     const label  = pid ? tail3(name) : (isGK ? "GK" : "용병");
-    const clipId = `fp-clip-${pid ?? "none"}-${cx}-${cy}`;
+    const jClipId = `${jerseyClipId}-${cx}-${cy}`;
 
     return (
       <g transform={`translate(${cx}, ${cy})`}>
         <defs>
-          {/* 사진을 겨드랑이 높이까지만 자르는 clipPath */}
-          <clipPath id={clipId}>
-            <rect x={PX} y={PY} width={PW} height={ARMPIT_Y - PY} />
+          {/* 유니폼: 목~겨드랑이까지만 보이게 clip */}
+          <clipPath id={jClipId}>
+            <rect
+              x={-UH * 0.7} y={NECK_Y}
+              width={UH * 1.4} height={ARMPIT_Y - NECK_Y}
+            />
           </clipPath>
         </defs>
 
-        {/* ① 팀 색 유니폼 — 원래 UniformIcon SVG path 사용 */}
-        <UniformIcon fill={jerseyFill} size={UH} stroke="#0a0b0f" />
+        {/* ① 팀 색 유니폼 (목~겨드랑이만 clip해서 표시) */}
+        <g clipPath={`url(#${jClipId})`}>
+          <UniformIcon fill={jerseyFill} size={UH} stroke="#0a0b0f" />
+        </g>
 
         {photo ? (
-          /* ② 투명 배경 사진 — 겨드랑이까지 clip, 배경 없이 그대로 합성 */
+          /* ② 투명 PNG 사진 — 하단이 유니폼 목에 딱 붙음, clip 없음(투명 배경) */
           <image
             href={photo}
             x={PX} y={PY}
             width={PW} height={PH}
-            clipPath={`url(#${clipId})`}
             preserveAspectRatio="xMidYMax meet"
           />
         ) : (
-          /* 사진 없으면 이름 이니셜 */
           <text
-            x={0} y={0}
+            x={0} y={NECK_Y * 0.3}
             dominantBaseline="central" textAnchor="middle"
             fill={labelColor} fontSize="7" fontWeight="800"
           >{label}</text>
         )}
 
-        {/* ③ 이름 라벨 */}
+        {/* ③ 이름 라벨 (유니폼 바로 아래) */}
         <text
-          x={0} y={UH * 0.60}
+          x={0} y={ARMPIT_Y + 8}
           dominantBaseline="middle" textAnchor="middle"
           fill="#d8dce6" fontSize="6" fontWeight="700"
         >{tail3(name) || (isGK ? "GK" : "")}</text>
