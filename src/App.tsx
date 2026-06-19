@@ -1672,12 +1672,22 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                       <input type="file" accept="image/*" style={{ display: "none" }}
                         onChange={e => {
                           const file = e.target.files?.[0]; if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = ev => {
-                            const dataUrl = ev.target?.result as string;
+                          // Canvas로 리사이즈 + JPEG 압축 (최대 200px, 품질 0.82)
+                          const img = new window.Image();
+                          const objUrl = URL.createObjectURL(file);
+                          img.onload = () => {
+                            const MAX = 200;
+                            const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+                            const w = Math.round(img.width * scale);
+                            const h = Math.round(img.height * scale);
+                            const canvas = document.createElement("canvas");
+                            canvas.width = w; canvas.height = h;
+                            canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+                            const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+                            URL.revokeObjectURL(objUrl);
                             setPlayers(prev => prev.map(x => x.id === p.id ? { ...x, photo: dataUrl } : x));
                           };
-                          reader.readAsDataURL(file);
+                          img.src = objUrl;
                           e.target.value = "";
                         }}
                       />
