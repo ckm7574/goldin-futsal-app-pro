@@ -610,7 +610,7 @@ function FormationPreview({
     const photo  = player?.photo || null;
     const label  = pid ? tail3(name) : (isGK ? "GK" : "용병");
     const jClipId = `${jerseyClipId}-${cx}-${cy}`;
-    const displayName = name || (isGK ? "GK" : "");
+    const displayName = name || (isGK ? "GK" : "용병");
 
     return (
       <g transform={`translate(${cx}, ${cy})`}>
@@ -629,34 +629,26 @@ function FormationPreview({
           <UniformIcon fill={jerseyFill} size={UH} stroke="#0a0b0f" />
         </g>
 
-        {photo ? (
-          /* ② 투명 PNG 사진 — 하단이 유니폼 목에 살짝 겹침, 사진이 유니폼 위에 렌더 */
+        {/* ② 사진 (있을 때만) */}
+        {photo && (
           <image
             href={photo}
             x={PX} y={PY}
             width={PW} height={PH}
             preserveAspectRatio="xMidYMid meet"
           />
-        ) : (
-          <text
-            x={0} y={NECK_Y * 0.3}
-            dominantBaseline="central" textAnchor="middle"
-            fill={labelColor} fontSize="7" fontWeight="800"
-          >{label}</text>
         )}
 
-        {/* ③ 이름 — 유니폼 안, 흰 글씨 + 검정 음각 테두리 (유니폼 밖으로 튀어나와도 잘 보임) */}
-        {displayName && (
-          <text
-            x={0} y={NAME_Y}
-            dominantBaseline="middle" textAnchor="middle"
-            fill="white"
-            fontSize="9" fontWeight="800"
-            stroke="black" strokeWidth="2"
-            paintOrder="stroke"
-            style={{ fontFamily: "inherit" }}
-          >{displayName}</text>
-        )}
+        {/* ③ 이름/용병/GK — 유니폼 안, 흰 글씨 + 검정 음각 테두리 */}
+        <text
+          x={0} y={NAME_Y}
+          dominantBaseline="middle" textAnchor="middle"
+          fill="white"
+          fontSize="9" fontWeight="800"
+          stroke="black" strokeWidth="2"
+          paintOrder="stroke"
+          style={{ fontFamily: "inherit" }}
+        >{displayName}</text>
       </g>
     );
   };
