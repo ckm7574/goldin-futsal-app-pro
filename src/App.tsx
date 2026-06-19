@@ -589,9 +589,10 @@ function FormationPreview({
   // 목(neck)  svgY≈22  → renderY = (22/100 - 0.5)*UH = -0.28*UH
   // 겨드랑이  svgY≈57  → renderY = (57/100 - 0.5)*UH = +0.07*UH
   // 유니폼 하단 svgY≈90 → renderY = (90/100 - 0.5)*UH = +0.40*UH
-  const UH = 56;                   // 유니폼 렌더 높이 (크기 업)
-  const NECK_Y   = -0.28 * UH;    // 목 위치 y
+  const UH = 56;                   // 유니폼 렌더 높이
+  const NECK_Y   = -0.35 * UH;    // 목 위치 y (살짝 위로)
   const ARMPIT_Y =  0.07 * UH;    // 겨드랑이 위치 y
+  const NAME_Y   =  (NECK_Y + ARMPIT_Y) / 2 + UH * 0.08; // 유니폼 중간~하단 (이름 위치)
 
   // 유니폼 clip: 상단(목)부터 겨드랑이까지만
   const jerseyClipId = `jersey-clip-${color}`;
@@ -609,6 +610,7 @@ function FormationPreview({
     const photo  = player?.photo || null;
     const label  = pid ? tail3(name) : (isGK ? "GK" : "용병");
     const jClipId = `${jerseyClipId}-${cx}-${cy}`;
+    const displayName = name || (isGK ? "GK" : "");
 
     return (
       <g transform={`translate(${cx}, ${cy})`}>
@@ -643,12 +645,18 @@ function FormationPreview({
           >{label}</text>
         )}
 
-        {/* ③ 이름 라벨 (유니폼 바로 아래) */}
-        <text
-          x={0} y={ARMPIT_Y + 10}
-          dominantBaseline="middle" textAnchor="middle"
-          fill="#d8dce6" fontSize="8" fontWeight="700"
-        >{tail3(name) || (isGK ? "GK" : "")}</text>
+        {/* ③ 이름 — 유니폼 안, 흰 글씨 + 검정 음각 테두리 (유니폼 밖으로 튀어나와도 잘 보임) */}
+        {displayName && (
+          <text
+            x={0} y={NAME_Y}
+            dominantBaseline="middle" textAnchor="middle"
+            fill="white"
+            fontSize="7.5" fontWeight="800"
+            stroke="black" strokeWidth="2.5"
+            paintOrder="stroke"
+            style={{ fontFamily: "inherit" }}
+          >{displayName}</text>
+        )}
       </g>
     );
   };
