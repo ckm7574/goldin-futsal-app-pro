@@ -570,103 +570,75 @@ function FormationPreview({
 
   const formationUsed: FormationKey = (fields.length >= 6 ? "2-2-2" : formation);
   const pts = FORMATION_POINTS[formationUsed];
+  // pts[0] = GK 위치, pts[1..] = 필드 슬롯
   const coordsFields = pts.slice(1);
   const chosenFields = fields.slice(0, coordsFields.length);
 
   const ringColor =
-    color === "red" ? "#E74C3C" :
+    color === "red"    ? "#E74C3C" :
     color === "yellow" ? "#F1C40F" :
-    color === "green" ? "#4CAF50" : "#EAEAEA";
+    color === "green"  ? "#4CAF50" : "#EAEAEA";
 
-  const jerseyFill =
-    color === "red" ? "var(--jersey-red)" :
-    color === "yellow" ? "var(--jersey-yellow)" :
-    color === "green" ? "var(--jersey-green)" : "var(--jersey-white)";
+  const textColor = color === "yellow" ? "#222" : "#fff";
 
-  // SVG foreignObject로 선수 사진 원형 렌더
-  const PlayerCircle = ({ pid, x, y, isGK = false }: { pid: string | null; x: number; y: number; isGK?: boolean }) => {
-    const player = pid ? players.find(p => p.id === pid) : null;
-    const name = player?.name || "";
-    const photo = player?.photo;
-    const label = pid ? tail3(name) : (isGK ? "GK" : "용병");
-    const r = 9; // 반지름 (SVG 단위)
+  // 100×155 좌표계 → % 변환
+  const toPercent = (x: number, y: number) => ({
+    left: `${x}%`,
+    top:  `${y}%`,
+  });
+
+  const PlayerDot = ({ pid, x, y, isGK = false }: { pid: string | null; x: number; y: number; isGK?: boolean }) => {
+    const player  = pid ? players.find(p => p.id === pid) : null;
+    const name    = player?.name || "";
+    const photo   = player?.photo || null;
+    const label   = pid ? tail3(name) : (isGK ? "GK" : "용병");
 
     return (
-      <g transform={`translate(${x}, ${y})`} textAnchor="middle">
-        {/* 팀 색 링 (배경) */}
-        <circle cx="0" cy="0" r={r + 1.2} fill={ringColor} />
-        {/* 사진 or 이니셜 배경 */}
-        <circle cx="0" cy="0" r={r} fill="#1a1c22" />
-        {photo ? (
-          <image
-            href={photo}
-            x={-r} y={-r}
-            width={r * 2} height={r * 2}
-            clipPath={`url(#clip-${pid || 'none'}-${x}-${y})`}
-            preserveAspectRatio="xMidYMid slice"
-          />
-        ) : (
-          <text
-            x="0" y="0"
-            dominantBaseline="central"
-            textAnchor="middle"
-            fill={color === "yellow" ? "#333" : "#eee"}
-            style={{ fontSize: "3.5px", fontWeight: 800 }}
-          >{label}</text>
-        )}
-        {/* 클리핑 마스크 */}
-        <defs>
-          <clipPath id={`clip-${pid || 'none'}-${x}-${y}`}>
-            <circle cx="0" cy="0" r={r} />
-          </clipPath>
-        </defs>
-        {/* 사진 있을 때 이름 라벨 */}
-        {photo && (
-          <text
-            x="0" y={r + 4}
-            dominantBaseline="middle"
-            textAnchor="middle"
-            fill="#e0e0e0"
-            style={{ fontSize: "2.8px", fontWeight: 700 }}
-          >{tail3(name)}</text>
-        )}
-      </g>
+      <div className="fp-dot-wrap" style={{ left: `${x}%`, top: `${y}%` }}>
+        <div className="fp-dot" style={{ borderColor: ringColor }}>
+          {photo
+            ? <img src={photo} alt={name} className="fp-dot-img" />
+            : <span className="fp-dot-label" style={{ color: textColor }}>{label}</span>
+          }
+        </div>
+        <div className="fp-dot-name" style={{ color: "#d0d4dc" }}>{tail3(name)}</div>
+      </div>
     );
   };
 
   return (
     <div className="formation-card">
-      <div className="formation-title">{teamName} <span className="subtle">({team}) · {formation}</span></div>
-      <svg viewBox="0 0 100 155" className="pitch">
-        <rect x="1" y="1" width="98" height="153" rx="4" className="pitch-bg" />
-        <rect x="1" y="1" width="98" height="153" rx="4" className="pitch-line" fill="none" />
-        <line x1="1" y1="77" x2="99" y2="77" className="pitch-line" />
-        <circle cx="50" cy="77" r="9" className="pitch-circle" />
-        <rect x="18" y="1" width="64" height="20" className="pitch-line" fill="none" />
-        <rect x="18" y="132" width="64" height="21" className="pitch-line" fill="none" />
+      <div className="formation-title">
+        {teamName} <span className="subtle">({team}) · {formation}</span>
+        <span style={{ display:"inline-block", width:10, height:10, borderRadius:3, background:ringColor, marginLeft:6, verticalAlign:"middle" }} />
+      </div>
 
+      {/* 피치 컨테이너 — 비율 고정 */}
+      <div className="fp-pitch">
+        {/* 피치 라인 */}
+        <div className="fp-line fp-line-mid" />
+        <div className="fp-circle-mid" />
+        <div className="fp-box fp-box-top" />
+        <div className="fp-box fp-box-bot" />
+
+        {/* 필드 선수 */}
         {coordsFields.map((pt, i) => {
           const pid = chosenFields[i] || null;
-          return <PlayerCircle key={i} pid={pid} x={pt.x} y={pt.y} />;
+          return <PlayerDot key={i} pid={pid} x={pt.x} y={pt.y} />;
         })}
 
         {/* GK */}
         {singleGK
-          ? <PlayerCircle pid={singleGK} x={50} y={143} isGK />
+          ? <PlayerDot pid={singleGK} x={pts[0].x} y={pts[0].y} isGK />
           : (
-            <g transform={`translate(${50}, ${143})`} textAnchor="middle">
-              <circle cx="0" cy="0" r={10.2} fill={ringColor} />
-              <circle cx="0" cy="0" r={9} fill="#1a1c22" />
-              <text x="0" y="0" dominantBaseline="central" textAnchor="middle"
-                fill={color === "yellow" ? "#333" : "#eee"}
-                style={{ fontSize: "3.5px", fontWeight: 800 }}>GK</text>
-            </g>
+            <div className="fp-dot-wrap" style={{ left: `${pts[0].x}%`, top: `${pts[0].y}%` }}>
+              <div className="fp-dot" style={{ borderColor: ringColor }}>
+                <span className="fp-dot-label" style={{ color: textColor }}>GK</span>
+              </div>
+            </div>
           )
         }
-
-        {/* 유니폼 아이콘 fallback (사진 없는 경우용 색상 팀 표시선) */}
-        <rect x="1" y="1" width="8" height="8" rx="2" fill={ringColor} opacity="0.7" />
-      </svg>
+      </div>
     </div>
   );
 }
@@ -1676,7 +1648,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                           const img = new window.Image();
                           const objUrl = URL.createObjectURL(file);
                           img.onload = () => {
-                            const MAX = 200;
+                            const MAX = 300;
                             const scale = Math.min(1, MAX / Math.max(img.width, img.height));
                             const w = Math.round(img.width * scale);
                             const h = Math.round(img.height * scale);
@@ -2339,16 +2311,97 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
 
         .analysis h4 { margin: 0 0 8px; }
 
-        /* ===== 포메이션 미리보기 ===== */
+        /* ===== 포메이션 미리보기 (HTML 기반) ===== */
         .formation-card { margin-top:10px; border:1px solid var(--line); border-radius:10px; padding:8px; background:#0D1016; }
-        .formation-title { font-weight:700; margin-bottom:6px; }
-        .pitch { width:100%; height:auto; display:block; background:#0D0F14; border-radius:8px; }
-        .pitch-bg { fill:#0E1218; }
-        .pitch-line { stroke:#2A2E36; stroke-width:0.7; }
-        .pitch-circle { fill:none; stroke:#2A2E36; stroke-width:0.7; }
-        .player-shadow { fill:#000; opacity:.35; transform: translateY(1px); }
-        .player-initials { fill:#0D0F14; font-size:3.2px; font-weight:800; }
-        .player-label { fill:#cfd3db; font-size:2.6px; }
+        .formation-title { font-weight:700; margin-bottom:6px; font-size:13px; }
+
+        /* 피치 컨테이너: 비율 고정 (3:4) */
+        .fp-pitch {
+          position: relative;
+          width: 100%;
+          padding-bottom: 133%;   /* 3:4 비율 */
+          background: #0b130b;
+          border-radius: 8px;
+          overflow: hidden;
+          border: 1px solid #1e2a1e;
+        }
+
+        /* 피치 라인들 */
+        .fp-line-mid {
+          position:absolute; top:50%; left:4%; width:92%; height:1px;
+          background: rgba(255,255,255,0.12);
+        }
+        .fp-circle-mid {
+          position:absolute; top:50%; left:50%;
+          width:18%; padding-bottom:18%;
+          margin-left:-9%; margin-top:-9%;
+          border-radius:50%;
+          border:1px solid rgba(255,255,255,0.12);
+        }
+        .fp-box {
+          position:absolute; left:20%; width:60%; height:10%;
+          border:1px solid rgba(255,255,255,0.12);
+        }
+        .fp-box-top { top:0%; border-top:none; }
+        .fp-box-bot { bottom:0%; border-bottom:none; }
+
+        /* 선수 점 */
+        .fp-dot-wrap {
+          position: absolute;
+          transform: translate(-50%, -50%);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 3px;
+          z-index: 1;
+        }
+        .fp-dot {
+          width: 46px;
+          height: 46px;
+          border-radius: 50%;
+          border: 3px solid #fff;
+          overflow: hidden;
+          background: #1a1c22;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+          flex-shrink: 0;
+        }
+        .fp-dot-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: center top;   /* 얼굴 위쪽 중심 */
+          display: block;
+        }
+        .fp-dot-label {
+          font-size: 11px;
+          font-weight: 800;
+          text-align: center;
+          line-height: 1;
+          padding: 0 2px;
+        }
+        .fp-dot-name {
+          font-size: 10px;
+          font-weight: 700;
+          text-align: center;
+          white-space: nowrap;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+          line-height: 1;
+        }
+
+        /* 반응형: 팀 그리드 3개일 때 dot 크기 줄임 */
+        @media (max-width: 900px) {
+          .fp-dot { width: 38px; height: 38px; }
+          .fp-dot-label { font-size: 9px; }
+          .fp-dot-name { font-size: 9px; }
+        }
+        @media (max-width: 600px) {
+          .fp-dot { width: 30px; height: 30px; border-width: 2px; }
+          .fp-dot-label { font-size: 8px; }
+          .fp-dot-name { font-size: 8px; }
+        }
 
         /* ===== 선수 스탯 카드 ===== */
         .player-stat-card { display:flex; gap:16px; align-items:flex-start; background:linear-gradient(135deg,#16181f,#1c1e27); border:1px solid var(--gold-2); border-radius:16px; padding:16px; margin-bottom:16px; flex-wrap:wrap; }
