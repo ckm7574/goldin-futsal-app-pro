@@ -652,7 +652,7 @@ function FormationPreview({
             dominantBaseline="middle" textAnchor="middle"
             fill="white"
             fontSize="9" fontWeight="800"
-            stroke="black" strokeWidth="3"
+            stroke="black" strokeWidth="2"
             paintOrder="stroke"
             style={{ fontFamily: "inherit" }}
           >{displayName}</text>
