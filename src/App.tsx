@@ -33,7 +33,7 @@ function getActiveTeams(hasTeamD: boolean): TeamId[] {
 type TeamId = typeof TEAM_IDS[number];
 type FormationKey = "1-2-1" | "2-2" | "3-1" | "2-2-1" | "2-2-2";
 
-type Player = { id: string; name: string; active: boolean; pos: "필드" | "GK" };
+type Player = { id: string; name: string; active: boolean; pos: "필드" | "GK"; photo?: string | null };
 type Match = {
   id: string;
   seq: number;
@@ -342,7 +342,8 @@ function emptySession(): Session {
 function normalizeLoaded(data: any): PersistShape {
   const today = ensureSunday(toISO(new Date()));
   let players = asArray<any>(data?.players, []).map((p: any) => ({
-    id: p?.id || uid(), name: String(p?.name || "?"), active: p?.active !== false, pos: p?.pos === "GK" ? "GK" : "필드"
+    id: p?.id || uid(), name: String(p?.name || "?"), active: p?.active !== false, pos: p?.pos === "GK" ? "GK" : "필드",
+    photo: (typeof p?.photo === "string" && p.photo) ? p.photo : null
   })) as Player[];
   if (players.length === 0) players = DEFAULT_PLAYERS.map(p => ({ id: uid(), name: p.name, active: true, pos: p.pos as any }));
 
@@ -563,57 +564,109 @@ function FormationPreview({
   color: "red" | "yellow" | "green" | "white";
   posOf: (pid: string) => Player["pos"];
 }) {
-  // --- Selection (FORMATION = fields only; GK separate) ---
   const gkIds = roster.filter(id => posOf(id) === "GK");
   const singleGK = gkIds.length === 1 ? gkIds[0] : null;
   const fields = roster.filter(id => posOf(id) !== "GK");
 
-  // points: [0]=GK, others=field slots
   const formationUsed: FormationKey = (fields.length >= 6 ? "2-2-2" : formation);
   const pts = FORMATION_POINTS[formationUsed];
   const coordsFields = pts.slice(1);
   const chosenFields = fields.slice(0, coordsFields.length);
+
+  const ringColor =
+    color === "red" ? "#E74C3C" :
+    color === "yellow" ? "#F1C40F" :
+    color === "green" ? "#4CAF50" : "#EAEAEA";
 
   const jerseyFill =
     color === "red" ? "var(--jersey-red)" :
     color === "yellow" ? "var(--jersey-yellow)" :
     color === "green" ? "var(--jersey-green)" : "var(--jersey-white)";
 
+  // SVG foreignObject로 선수 사진 원형 렌더
+  const PlayerCircle = ({ pid, x, y, isGK = false }: { pid: string | null; x: number; y: number; isGK?: boolean }) => {
+    const player = pid ? players.find(p => p.id === pid) : null;
+    const name = player?.name || "";
+    const photo = player?.photo;
+    const label = pid ? tail3(name) : (isGK ? "GK" : "용병");
+    const r = 9; // 반지름 (SVG 단위)
+
+    return (
+      <g transform={`translate(${x}, ${y})`} textAnchor="middle">
+        {/* 팀 색 링 (배경) */}
+        <circle cx="0" cy="0" r={r + 1.2} fill={ringColor} />
+        {/* 사진 or 이니셜 배경 */}
+        <circle cx="0" cy="0" r={r} fill="#1a1c22" />
+        {photo ? (
+          <image
+            href={photo}
+            x={-r} y={-r}
+            width={r * 2} height={r * 2}
+            clipPath={`url(#clip-${pid || 'none'}-${x}-${y})`}
+            preserveAspectRatio="xMidYMid slice"
+          />
+        ) : (
+          <text
+            x="0" y="0"
+            dominantBaseline="central"
+            textAnchor="middle"
+            fill={color === "yellow" ? "#333" : "#eee"}
+            style={{ fontSize: "3.5px", fontWeight: 800 }}
+          >{label}</text>
+        )}
+        {/* 클리핑 마스크 */}
+        <defs>
+          <clipPath id={`clip-${pid || 'none'}-${x}-${y}`}>
+            <circle cx="0" cy="0" r={r} />
+          </clipPath>
+        </defs>
+        {/* 사진 있을 때 이름 라벨 */}
+        {photo && (
+          <text
+            x="0" y={r + 4}
+            dominantBaseline="middle"
+            textAnchor="middle"
+            fill="#e0e0e0"
+            style={{ fontSize: "2.8px", fontWeight: 700 }}
+          >{tail3(name)}</text>
+        )}
+      </g>
+    );
+  };
+
   return (
     <div className="formation-card">
       <div className="formation-title">{teamName} <span className="subtle">({team}) · {formation}</span></div>
-      <svg viewBox="0 0 100 140" className="pitch">
-        <rect x="1" y="1" width="98" height="138" rx="4" className="pitch-bg" />
-        <rect x="1" y="1" width="98" height="138" rx="4" className="pitch-line" fill="none" />
-        <line x1="1" y1="70" x2="99" y2="70" className="pitch-line" />
-        <circle cx="50" cy="70" r="9" className="pitch-circle" />
+      <svg viewBox="0 0 100 155" className="pitch">
+        <rect x="1" y="1" width="98" height="153" rx="4" className="pitch-bg" />
+        <rect x="1" y="1" width="98" height="153" rx="4" className="pitch-line" fill="none" />
+        <line x1="1" y1="77" x2="99" y2="77" className="pitch-line" />
+        <circle cx="50" cy="77" r="9" className="pitch-circle" />
         <rect x="18" y="1" width="64" height="20" className="pitch-line" fill="none" />
-        <rect x="18" y="119" width="64" height="20" className="pitch-line" fill="none" />
+        <rect x="18" y="132" width="64" height="21" className="pitch-line" fill="none" />
 
         {coordsFields.map((pt, i) => {
           const pid = chosenFields[i] || null;
-          const name = pid ? (players.find(p => p.id === pid)?.name || "?") : "";
-          const initialsTxt = pid ? tail3(name) : "용병";
-          return (
-            <g key={i} transform={`translate(${pt.x}, ${pt.y})`} textAnchor="middle">
-              <UniformIcon fill={jerseyFill} size={20} stroke="var(--jersey-stroke)" />
-              <text className="player-initials" dominantBaseline="middle" dy="0.3em">{initialsTxt}</text>
-            </g>
-          );
+          return <PlayerCircle key={i} pid={pid} x={pt.x} y={pt.y} />;
         })}
 
-        {/* GK: exactly one GK shows at goal center (bottom) */}
-        {singleGK && (
-          <g transform={`translate(${50}, ${129})`} textAnchor="middle">
-            <UniformIcon fill={jerseyFill} size={20} stroke="var(--jersey-stroke)" />
-            <text className="player-initials" dominantBaseline="middle" dy="0.3em">
-              {tail3(players.find(p => p.id === singleGK)?.name || "?")}
-            </text>
-          </g>
-        )}
-      </svg>
+        {/* GK */}
+        {singleGK
+          ? <PlayerCircle pid={singleGK} x={50} y={143} isGK />
+          : (
+            <g transform={`translate(${50}, ${143})`} textAnchor="middle">
+              <circle cx="0" cy="0" r={10.2} fill={ringColor} />
+              <circle cx="0" cy="0" r={9} fill="#1a1c22" />
+              <text x="0" y="0" dominantBaseline="central" textAnchor="middle"
+                fill={color === "yellow" ? "#333" : "#eee"}
+                style={{ fontSize: "3.5px", fontWeight: 800 }}>GK</text>
+            </g>
+          )
+        }
 
-      {null}
+        {/* 유니폼 아이콘 fallback (사진 없는 경우용 색상 팀 표시선) */}
+        <rect x="1" y="1" width="8" height="8" rx="2" fill={ringColor} opacity="0.7" />
+      </svg>
     </div>
   );
 }
@@ -1608,6 +1661,34 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
             {playersSorted.map(p => (
             
               <div key={p.id} className="player-admin-item">
+                {/* 사진 업로드 */}
+                <div className="player-photo-col">
+                  <label className="player-photo-upload" title="사진 변경">
+                    {p.photo
+                      ? <img src={p.photo} alt={p.name} className="player-photo-thumb" />
+                      : <span className="player-photo-placeholder">{p.name.slice(0,1)}</span>
+                    }
+                    {!readonly && (
+                      <input type="file" accept="image/*" style={{ display: "none" }}
+                        onChange={e => {
+                          const file = e.target.files?.[0]; if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = ev => {
+                            const dataUrl = ev.target?.result as string;
+                            setPlayers(prev => prev.map(x => x.id === p.id ? { ...x, photo: dataUrl } : x));
+                          };
+                          reader.readAsDataURL(file);
+                          e.target.value = "";
+                        }}
+                      />
+                    )}
+                  </label>
+                  {p.photo && !readonly && (
+                    <button className="player-photo-del" title="사진 삭제"
+                      onClick={() => setPlayers(prev => prev.map(x => x.id === p.id ? { ...x, photo: null } : x))}
+                    >✕</button>
+                  )}
+                </div>
                 <input
                   className="player-name-input"
                   value={p.name}
@@ -2009,12 +2090,31 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
 
         {selectedPlayerData && (
           <div className="analysis">
-            <h4>{selectedPlayerData.name} ({selectedPlayerData.teamName})</h4>
-            <div style={{ margin: '8px 0 16px 0' }}>
-              <FifaSection
-                players={[{ id: (selectedPlayerId || (selectedPlayerData as any).id), name: selectedPlayerData.name }]}
-                readonly
-              />
+            {/* 선수 프로필 카드 */}
+            <div className="player-stat-card">
+              <div className="player-stat-photo-wrap">
+                {(() => {
+                  const photo = players.find(p => p.id === selectedPlayerId)?.photo;
+                  return photo
+                    ? <img src={photo} alt={selectedPlayerData.name} className="player-stat-photo" />
+                    : <div className="player-stat-photo-placeholder">{selectedPlayerData.name.slice(0,1)}</div>;
+                })()}
+              </div>
+              <div className="player-stat-info">
+                <div className="player-stat-name">{selectedPlayerData.name}</div>
+                <div className="player-stat-meta">
+                  <span className="player-stat-team">{selectedPlayerData.teamName}</span>
+                  <span className="player-stat-pos">{players.find(p => p.id === selectedPlayerId)?.pos || "필드"}</span>
+                </div>
+                <div className="player-stat-nums">
+                  <span><b>{selectedPlayerData.goals}</b><small>골</small></span>
+                  <span><b>{selectedPlayerData.assists}</b><small>도움</small></span>
+                  <span><b>{selectedPlayerData.def}</b><small>수비상</small></span>
+                  <span><b>{selectedPlayerData.cleansheets}</b><small>CS</small></span>
+                  <span><b>{selectedPlayerData.teamBonus}</b><small>팀보너스</small></span>
+                  <span className="player-stat-total"><b>{selectedPlayerData.total}</b><small>합계</small></span>
+                </div>
+              </div>
             </div>
 
             <div className="charts" style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
@@ -2173,10 +2273,19 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
         /* 선수관리 */
         .players-admin-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
         @media (min-width: 1024px) { .players-admin-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-        .player-admin-item { display:grid; grid-template-columns: 1fr 84px 78px; gap:6px; border:1px solid var(--line); border-radius:10px; padding:6px; background:#0B0C10; }
+        .player-admin-item { display:grid; grid-template-columns: 52px 1fr 84px 78px; gap:6px; border:1px solid var(--line); border-radius:10px; padding:6px; background:#0B0C10; align-items:center; }
         .player-name-input { min-width: 0; width:100%; padding:6px 8px; font-size:14px; }
         .player-admin-item select { padding:6px 8px; font-size:14px; }
         .player-admin-item button { padding:6px 8px; font-size:13px; }
+
+        /* 선수 사진 업로드 */
+        .player-photo-col { display:flex; flex-direction:column; align-items:center; gap:2px; }
+        .player-photo-upload { position:relative; width:44px; height:44px; border-radius:50%; overflow:hidden; cursor:pointer; border:2px solid var(--gold-2); display:flex; align-items:center; justify-content:center; background:#1a1c22; transition: border-color .15s; }
+        .player-photo-upload:hover { border-color:var(--gold); }
+        .player-photo-thumb { width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
+        .player-photo-placeholder { font-size:18px; font-weight:800; color:var(--gold); user-select:none; }
+        .player-photo-del { padding:1px 5px; font-size:10px; background:#2a0a0a; border-color:#5a2020; color:#ff8a8a; border-radius:999px; cursor:pointer; }
+        .player-photo-del:hover { background:#3a1010; }
 
         .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border:1px solid var(--line); border-radius:10px; padding:6px; background:#0F1116; }
         .tbl { width: 100%; border-collapse: separate; border-spacing: 0; color: var(--text); }
@@ -2230,6 +2339,22 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
         .player-shadow { fill:#000; opacity:.35; transform: translateY(1px); }
         .player-initials { fill:#0D0F14; font-size:3.2px; font-weight:800; }
         .player-label { fill:#cfd3db; font-size:2.6px; }
+
+        /* ===== 선수 스탯 카드 ===== */
+        .player-stat-card { display:flex; gap:16px; align-items:flex-start; background:linear-gradient(135deg,#16181f,#1c1e27); border:1px solid var(--gold-2); border-radius:16px; padding:16px; margin-bottom:16px; flex-wrap:wrap; }
+        .player-stat-photo-wrap { flex-shrink:0; }
+        .player-stat-photo { width:90px; height:90px; border-radius:50%; object-fit:cover; border:3px solid var(--gold); box-shadow:0 0 12px rgba(212,175,55,0.3); display:block; }
+        .player-stat-photo-placeholder { width:90px; height:90px; border-radius:50%; background:linear-gradient(135deg,#2a2c35,#1a1c24); border:3px solid var(--gold-2); display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:800; color:var(--gold); }
+        .player-stat-info { flex:1 1 200px; display:flex; flex-direction:column; gap:6px; }
+        .player-stat-name { font-size:22px; font-weight:800; color:var(--text); }
+        .player-stat-meta { display:flex; gap:8px; align-items:center; }
+        .player-stat-team { font-size:13px; color:var(--gold); background:rgba(212,175,55,0.12); border:1px solid rgba(212,175,55,0.3); border-radius:999px; padding:2px 10px; }
+        .player-stat-pos { font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:2px 8px; }
+        .player-stat-nums { display:flex; gap:12px; flex-wrap:wrap; margin-top:4px; }
+        .player-stat-nums span { display:flex; flex-direction:column; align-items:center; min-width:40px; }
+        .player-stat-nums b { font-size:20px; font-weight:800; color:var(--text); line-height:1; }
+        .player-stat-nums small { font-size:10px; color:var(--muted); margin-top:2px; }
+        .player-stat-total b { color:var(--gold); font-size:24px; }
 
         /* ===== 랭킹 보드 ===== */
         .ranking-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
