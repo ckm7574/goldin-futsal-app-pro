@@ -579,41 +579,63 @@ function FormationPreview({
     color === "green"  ? "#4CAF50" : "#EAEAEA";
   const labelColor = color === "yellow" ? "#1a1a1a" : "#ffffff";
 
-  // 유니폼 크기
-  const UH = 44;
-  // 사진 오버레이 크기: 유니폼보다 크게 잡아서 얼굴+상반신이 자연스럽게 덮이도록
-  const PHOTO_W = UH * 1.6;
-  const PHOTO_H = UH * 1.6;
-
   const jerseyFill =
     color === "red"    ? "var(--jersey-red)"    :
     color === "yellow" ? "var(--jersey-yellow)" :
     color === "green"  ? "var(--jersey-green)"  : "var(--jersey-white)";
+
+  // ── 치수 (viewBox 200×280 단위) ──────────────────
+  // 유니폼: 어깨~허리 부분만 보이는 작은 직사각형 색 블록
+  const JW = 32;   // 유니폼 블록 너비
+  const JH = 18;   // 유니폼 블록 높이 (어깨~겨드랑이)
+  const JY = 8;    // 유니폼 블록 y 오프셋 (중심 기준, 아래쪽)
+  // 사진: 증명사진 비율 (겨드랑이까지), clipRect로 직사각형 자르기
+  const PW = 28;   // 사진 너비
+  const PH = 34;   // 사진 높이 (겨드랑이까지)
+  const PY = -PH * 0.75; // 사진 상단 y (중심 기준 위쪽)
+  // 전체 높이 계산 (라벨 위치용 - 현재 미사용)
 
   const PlayerNode = ({ pid, cx, cy, isGK = false }: { pid: string | null; cx: number; cy: number; isGK?: boolean }) => {
     const player = pid ? players.find(p => p.id === pid) : null;
     const name   = player?.name || "";
     const photo  = player?.photo || null;
     const label  = pid ? tail3(name) : (isGK ? "GK" : "용병");
+    const clipId = `fp-clip-${pid ?? "none"}-${cx}-${cy}`;
 
     return (
       <g transform={`translate(${cx}, ${cy})`}>
-        {/* ① 팀 색 유니폼 */}
-        <UniformIcon fill={jerseyFill} size={UH} stroke="#0a0b0f" />
+        <defs>
+          {/* 사진을 직사각형(겨드랑이까지)으로 자르는 clipPath */}
+          <clipPath id={clipId}>
+            <rect x={-PW / 2} y={PY} width={PW} height={PH} />
+          </clipPath>
+        </defs>
+
+        {/* ① 팀 색 유니폼: 어깨~겨드랑이 직사각형 블록 */}
+        <rect
+          x={-JW / 2} y={JY}
+          width={JW} height={JH}
+          rx={3}
+          fill={jerseyFill}
+          stroke="#0a0b0f" strokeWidth="0.8"
+        />
+        {/* 어깨 라인 (양쪽 슬리브 느낌) */}
+        <rect x={-JW / 2 - 5} y={JY} width={5} height={JH * 0.6} rx={2} fill={jerseyFill} stroke="#0a0b0f" strokeWidth="0.8" />
+        <rect x={ JW / 2}     y={JY} width={5} height={JH * 0.6} rx={2} fill={jerseyFill} stroke="#0a0b0f" strokeWidth="0.8" />
 
         {photo ? (
-          /* ② 투명 배경 사진: 클립/원 없이 그냥 올려서 자연스럽게 합성 */
+          /* ② 투명 배경 사진 — 직사각형 clip (겨드랑이까지) */
           <image
             href={photo}
-            x={-PHOTO_W / 2}
-            y={-PHOTO_H * 0.72}   /* 사진 하단이 유니폼 중간쯤 오도록 */
-            width={PHOTO_W}
-            height={PHOTO_H}
-            preserveAspectRatio="xMidYMax meet"
+            x={-PW / 2} y={PY}
+            width={PW} height={PH}
+            clipPath={`url(#${clipId})`}
+            preserveAspectRatio="xMidYMid meet"
           />
         ) : (
+          /* 사진 없으면 이름 이니셜 */
           <text
-            x={0} y={4}
+            x={0} y={JY + JH * 0.5}
             dominantBaseline="central" textAnchor="middle"
             fill={labelColor} fontSize="7" fontWeight="800"
           >{label}</text>
@@ -621,7 +643,7 @@ function FormationPreview({
 
         {/* ③ 이름 라벨 */}
         <text
-          x={0} y={UH * 0.6}
+          x={0} y={JY + JH + 7}
           dominantBaseline="middle" textAnchor="middle"
           fill="#d8dce6" fontSize="6" fontWeight="700"
         >{tail3(name) || (isGK ? "GK" : "")}</text>
