@@ -579,14 +579,11 @@ function FormationPreview({
     color === "green"  ? "#4CAF50" : "#EAEAEA";
   const labelColor = color === "yellow" ? "#1a1a1a" : "#ffffff";
 
-  // r=18 : 원 반지름 (viewBox 200×280 기준)
-  const R = 18;
-  // 유니폼 크기 (UniformIcon viewBox 0 0 100 100 기준, 몸통 표시 영역)
-  const UW = 44;   // 유니폼 렌더 width
-  const UH = 44;   // 유니폼 렌더 height
-  // 얼굴 원: 유니폼 상단 넥라인 기준 위에 배치
-  const FACE_R = 13;  // 얼굴 원 반지름
-  const FACE_DY = -UH * 0.30; // 유니폼 중심 기준 얼굴 오프셋 (위쪽)
+  // 유니폼 크기
+  const UH = 44;
+  // 사진 오버레이 크기: 유니폼보다 크게 잡아서 얼굴+상반신이 자연스럽게 덮이도록
+  const PHOTO_W = UH * 1.6;
+  const PHOTO_H = UH * 1.6;
 
   const jerseyFill =
     color === "red"    ? "var(--jersey-red)"    :
@@ -598,47 +595,33 @@ function FormationPreview({
     const name   = player?.name || "";
     const photo  = player?.photo || null;
     const label  = pid ? tail3(name) : (isGK ? "GK" : "용병");
-    const clipId = `fp-clip-${pid ?? "none"}-${cx}-${cy}`;
-    // 얼굴 원 중심: 유니폼 중심에서 위로
-    const faceCx = cx;
-    const faceCy = cy + FACE_DY;
 
     return (
       <g transform={`translate(${cx}, ${cy})`}>
-        <defs>
-          <clipPath id={clipId}>
-            <circle cx={0} cy={FACE_DY} r={FACE_R} />
-          </clipPath>
-        </defs>
-
-        {/* ① 팀 색 유니폼 — UniformIcon은 내부적으로 x=-(size*1.25)/2, y=-(size)/2 자체 오프셋 적용 */}
+        {/* ① 팀 색 유니폼 */}
         <UniformIcon fill={jerseyFill} size={UH} stroke="#0a0b0f" />
 
         {photo ? (
-          <>
-            {/* ② 얼굴 원형 테두리 (유니폼 목 색상) */}
-            <circle cx={0} cy={FACE_DY} r={FACE_R + 1.5} fill={jerseyFill} />
-            {/* ③ 얼굴 사진 */}
-            <image
-              href={photo}
-              x={-FACE_R} y={FACE_DY - FACE_R}
-              width={FACE_R * 2} height={FACE_R * 2}
-              clipPath={`url(#${clipId})`}
-              preserveAspectRatio="xMidYMin slice"
-            />
-          </>
+          /* ② 투명 배경 사진: 클립/원 없이 그냥 올려서 자연스럽게 합성 */
+          <image
+            href={photo}
+            x={-PHOTO_W / 2}
+            y={-PHOTO_H * 0.72}   /* 사진 하단이 유니폼 중간쯤 오도록 */
+            width={PHOTO_W}
+            height={PHOTO_H}
+            preserveAspectRatio="xMidYMax meet"
+          />
         ) : (
           <text
             x={0} y={4}
             dominantBaseline="central" textAnchor="middle"
-            fill={labelColor}
-            fontSize="7" fontWeight="800"
+            fill={labelColor} fontSize="7" fontWeight="800"
           >{label}</text>
         )}
 
-        {/* ④ 이름 라벨 */}
+        {/* ③ 이름 라벨 */}
         <text
-          x={0} y={UH * 0.58}
+          x={0} y={UH * 0.6}
           dominantBaseline="middle" textAnchor="middle"
           fill="#d8dce6" fontSize="6" fontWeight="700"
         >{tail3(name) || (isGK ? "GK" : "")}</text>
