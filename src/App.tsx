@@ -581,6 +581,17 @@ function FormationPreview({
 
   // r=18 : 원 반지름 (viewBox 200×280 기준)
   const R = 18;
+  // 유니폼 크기 (UniformIcon viewBox 0 0 100 100 기준, 몸통 표시 영역)
+  const UW = 44;   // 유니폼 렌더 width
+  const UH = 44;   // 유니폼 렌더 height
+  // 얼굴 원: 유니폼 상단 넥라인 기준 위에 배치
+  const FACE_R = 13;  // 얼굴 원 반지름
+  const FACE_DY = -UH * 0.30; // 유니폼 중심 기준 얼굴 오프셋 (위쪽)
+
+  const jerseyFill =
+    color === "red"    ? "var(--jersey-red)"    :
+    color === "yellow" ? "var(--jersey-yellow)" :
+    color === "green"  ? "var(--jersey-green)"  : "var(--jersey-white)";
 
   const PlayerNode = ({ pid, cx, cy, isGK = false }: { pid: string | null; cx: number; cy: number; isGK?: boolean }) => {
     const player = pid ? players.find(p => p.id === pid) : null;
@@ -588,40 +599,48 @@ function FormationPreview({
     const photo  = player?.photo || null;
     const label  = pid ? tail3(name) : (isGK ? "GK" : "용병");
     const clipId = `fp-clip-${pid ?? "none"}-${cx}-${cy}`;
+    // 얼굴 원 중심: 유니폼 중심에서 위로
+    const faceCx = cx;
+    const faceCy = cy + FACE_DY;
 
     return (
-      <g>
+      <g transform={`translate(${cx}, ${cy})`}>
         <defs>
           <clipPath id={clipId}>
-            <circle cx={cx} cy={cy} r={R} />
+            <circle cx={0} cy={FACE_DY} r={FACE_R} />
           </clipPath>
         </defs>
-        {/* 팀 색 링 */}
-        <circle cx={cx} cy={cy} r={R + 2.5} fill={ringColor} />
-        {/* 배경 */}
-        <circle cx={cx} cy={cy} r={R} fill="#1a1c22" />
+
+        {/* ① 팀 색 유니폼 — UniformIcon은 내부적으로 x=-(size*1.25)/2, y=-(size)/2 자체 오프셋 적용 */}
+        <UniformIcon fill={jerseyFill} size={UH} stroke="#0a0b0f" />
+
         {photo ? (
-          <image
-            href={photo}
-            x={cx - R} y={cy - R}
-            width={R * 2} height={R * 2}
-            clipPath={`url(#${clipId})`}
-            preserveAspectRatio="xMidYMin slice"
-          />
+          <>
+            {/* ② 얼굴 원형 테두리 (유니폼 목 색상) */}
+            <circle cx={0} cy={FACE_DY} r={FACE_R + 1.5} fill={jerseyFill} />
+            {/* ③ 얼굴 사진 */}
+            <image
+              href={photo}
+              x={-FACE_R} y={FACE_DY - FACE_R}
+              width={FACE_R * 2} height={FACE_R * 2}
+              clipPath={`url(#${clipId})`}
+              preserveAspectRatio="xMidYMin slice"
+            />
+          </>
         ) : (
           <text
-            x={cx} y={cy}
+            x={0} y={4}
             dominantBaseline="central" textAnchor="middle"
             fill={labelColor}
             fontSize="7" fontWeight="800"
           >{label}</text>
         )}
-        {/* 이름 라벨 (항상 표시) */}
+
+        {/* ④ 이름 라벨 */}
         <text
-          x={cx} y={cy + R + 8}
+          x={0} y={UH * 0.58}
           dominantBaseline="middle" textAnchor="middle"
           fill="#d8dce6" fontSize="6" fontWeight="700"
-          style={{ textShadow: "0 1px 3px #000" }}
         >{tail3(name) || (isGK ? "GK" : "")}</text>
       </g>
     );
