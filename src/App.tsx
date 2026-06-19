@@ -533,7 +533,7 @@ const FORMATION_POINTS: Record<FormationKey, { x: number; y: number; label: stri
   "2-2-1": [
     { x: 100, y: 240, label: "GK" },
     { x:  55, y: 205, label: "DF" }, { x: 145, y: 205, label: "DF" },
-    { x:  55, y: 145, label: "MF" }, { x: 145, y: 145, label: "MF" },
+    { x:  55, y: 125, label: "MF" }, { x: 145, y: 125, label: "MF" },
     { x: 100, y:  70, label: "FW" },
   ],
   "2-2-2": [
@@ -651,8 +651,8 @@ function FormationPreview({
             x={0} y={NAME_Y}
             dominantBaseline="middle" textAnchor="middle"
             fill="white"
-            fontSize="7.5" fontWeight="800"
-            stroke="black" strokeWidth="2.5"
+            fontSize="9" fontWeight="800"
+            stroke="black" strokeWidth="3"
             paintOrder="stroke"
             style={{ fontFamily: "inherit" }}
           >{displayName}</text>
