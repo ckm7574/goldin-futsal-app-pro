@@ -589,18 +589,19 @@ function FormationPreview({
   // 목(neck)  svgY≈22  → renderY = (22/100 - 0.5)*UH = -0.28*UH
   // 겨드랑이  svgY≈57  → renderY = (57/100 - 0.5)*UH = +0.07*UH
   // 유니폼 하단 svgY≈90 → renderY = (90/100 - 0.5)*UH = +0.40*UH
-  const UH = 46;                   // 유니폼 렌더 높이
+  const UH = 56;                   // 유니폼 렌더 높이 (크기 업)
   const NECK_Y   = -0.28 * UH;    // 목 위치 y
   const ARMPIT_Y =  0.07 * UH;    // 겨드랑이 위치 y
 
   // 유니폼 clip: 상단(목)부터 겨드랑이까지만
   const jerseyClipId = `jersey-clip-${color}`;
 
-  // 사진: 넥 바로 위에 하단이 딱 붙도록
+  // 사진: 하단이 유니폼 목 위치보다 OVERLAP만큼 아래로 내려와 살짝 겹침
+  const OVERLAP = UH * 0.08;       // 유니폼 목과 사진 하단 겹침량
   const PW = UH * 1.1;            // 사진 너비
   const PH = UH * 1.1;            // 사진 높이
   const PX = -PW / 2;
-  const PY = NECK_Y - PH;         // 사진 하단이 넥에 딱 붙음
+  const PY = NECK_Y - PH + OVERLAP; // 사진 하단이 넥에 살짝 겹침
 
   const PlayerNode = ({ pid, cx, cy, isGK = false }: { pid: string | null; cx: number; cy: number; isGK?: boolean }) => {
     const player = pid ? players.find(p => p.id === pid) : null;
@@ -627,7 +628,7 @@ function FormationPreview({
         </g>
 
         {photo ? (
-          /* ② 투명 PNG 사진 — 하단이 유니폼 목에 딱 붙음, clip 없음(투명 배경) */
+          /* ② 투명 PNG 사진 — 하단이 유니폼 목에 살짝 겹침, 사진이 유니폼 위에 렌더 */
           <image
             href={photo}
             x={PX} y={PY}
@@ -644,9 +645,9 @@ function FormationPreview({
 
         {/* ③ 이름 라벨 (유니폼 바로 아래) */}
         <text
-          x={0} y={ARMPIT_Y + 8}
+          x={0} y={ARMPIT_Y + 10}
           dominantBaseline="middle" textAnchor="middle"
-          fill="#d8dce6" fontSize="6" fontWeight="700"
+          fill="#d8dce6" fontSize="8" fontWeight="700"
         >{tail3(name) || (isGK ? "GK" : "")}</text>
       </g>
     );
