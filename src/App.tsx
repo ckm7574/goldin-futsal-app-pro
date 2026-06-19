@@ -585,15 +585,17 @@ function FormationPreview({
     color === "green"  ? "var(--jersey-green)"  : "var(--jersey-white)";
 
   // ── 치수 (viewBox 200×280 단위) ──────────────────
-  // 유니폼: 어깨~허리 부분만 보이는 작은 직사각형 색 블록
-  const JW = 32;   // 유니폼 블록 너비
-  const JH = 18;   // 유니폼 블록 높이 (어깨~겨드랑이)
-  const JY = 8;    // 유니폼 블록 y 오프셋 (중심 기준, 아래쪽)
-  // 사진: 증명사진 비율 (겨드랑이까지), clipRect로 직사각형 자르기
-  const PW = 28;   // 사진 너비
-  const PH = 34;   // 사진 높이 (겨드랑이까지)
-  const PY = -PH * 0.75; // 사진 상단 y (중심 기준 위쪽)
-  // 전체 높이 계산 (라벨 위치용 - 현재 미사용)
+  // 유니폼 SVG 렌더 크기
+  const UH = 38;   // UniformIcon size
+  // 사진: 유니폼 위에 겨드랑이까지 덮도록
+  // UniformIcon: viewBox 0 0 100 100, 몸통은 y=12~90, 어깨는 x=28~72
+  // size=UH 기준: y=-(UH/2) ~ +(UH/2), 넥 y≈-UH*0.28, 겨드랑이 y≈+UH*0.10
+  const PW = UH * 1.1;          // 사진 너비 (유니폼 어깨폭과 맞춤)
+  const PH = UH * 1.05;         // 사진 높이 (얼굴~겨드랑이)
+  const PX = -PW / 2;           // 사진 x 시작
+  const PY = -UH * 0.60;        // 사진 y 시작 (머리 위부터)
+  // 겨드랑이 라인: UniformIcon에서 y≈+UH*0.10 위치
+  const ARMPIT_Y = UH * 0.10;   // 이 y까지만 사진 보이게 clip
 
   const PlayerNode = ({ pid, cx, cy, isGK = false }: { pid: string | null; cx: number; cy: number; isGK?: boolean }) => {
     const player = pid ? players.find(p => p.id === pid) : null;
@@ -605,37 +607,28 @@ function FormationPreview({
     return (
       <g transform={`translate(${cx}, ${cy})`}>
         <defs>
-          {/* 사진을 직사각형(겨드랑이까지)으로 자르는 clipPath */}
+          {/* 사진을 겨드랑이 높이까지만 자르는 clipPath */}
           <clipPath id={clipId}>
-            <rect x={-PW / 2} y={PY} width={PW} height={PH} />
+            <rect x={PX} y={PY} width={PW} height={ARMPIT_Y - PY} />
           </clipPath>
         </defs>
 
-        {/* ① 팀 색 유니폼: 어깨~겨드랑이 직사각형 블록 */}
-        <rect
-          x={-JW / 2} y={JY}
-          width={JW} height={JH}
-          rx={3}
-          fill={jerseyFill}
-          stroke="#0a0b0f" strokeWidth="0.8"
-        />
-        {/* 어깨 라인 (양쪽 슬리브 느낌) */}
-        <rect x={-JW / 2 - 5} y={JY} width={5} height={JH * 0.6} rx={2} fill={jerseyFill} stroke="#0a0b0f" strokeWidth="0.8" />
-        <rect x={ JW / 2}     y={JY} width={5} height={JH * 0.6} rx={2} fill={jerseyFill} stroke="#0a0b0f" strokeWidth="0.8" />
+        {/* ① 팀 색 유니폼 — 원래 UniformIcon SVG path 사용 */}
+        <UniformIcon fill={jerseyFill} size={UH} stroke="#0a0b0f" />
 
         {photo ? (
-          /* ② 투명 배경 사진 — 직사각형 clip (겨드랑이까지) */
+          /* ② 투명 배경 사진 — 겨드랑이까지 clip, 배경 없이 그대로 합성 */
           <image
             href={photo}
-            x={-PW / 2} y={PY}
+            x={PX} y={PY}
             width={PW} height={PH}
             clipPath={`url(#${clipId})`}
-            preserveAspectRatio="xMidYMid meet"
+            preserveAspectRatio="xMidYMax meet"
           />
         ) : (
           /* 사진 없으면 이름 이니셜 */
           <text
-            x={0} y={JY + JH * 0.5}
+            x={0} y={0}
             dominantBaseline="central" textAnchor="middle"
             fill={labelColor} fontSize="7" fontWeight="800"
           >{label}</text>
@@ -643,7 +636,7 @@ function FormationPreview({
 
         {/* ③ 이름 라벨 */}
         <text
-          x={0} y={JY + JH + 7}
+          x={0} y={UH * 0.60}
           dominantBaseline="middle" textAnchor="middle"
           fill="#d8dce6" fontSize="6" fontWeight="700"
         >{tail3(name) || (isGK ? "GK" : "")}</text>
@@ -1697,7 +1690,8 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                             const canvas = document.createElement("canvas");
                             canvas.width = w; canvas.height = h;
                             canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
-                            const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+                            // PNG로 저장 — 투명 배경(SVG/PNG) 유지, JPEG는 투명도를 검정으로 변환함
+            const dataUrl = canvas.toDataURL("image/png");
                             URL.revokeObjectURL(objUrl);
                             setPlayers(prev => prev.map(x => x.id === p.id ? { ...x, photo: dataUrl } : x));
                           };
