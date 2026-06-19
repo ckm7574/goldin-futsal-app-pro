@@ -596,9 +596,9 @@ function FormationPreview({
   // 유니폼 clip: 상단(목)부터 겨드랑이까지만
   const jerseyClipId = `jersey-clip-${color}`;
 
-  // 사진: 넥 바로 위에 하단이 딱 붙도록, 크기 1.65배(3배의 절반)
-  const PW = UH * 1.65;           // 사진 너비 (3배의 절반)
-  const PH = UH * 1.65;           // 사진 높이 (3배의 절반)
+  // 사진: 넥 바로 위에 하단이 딱 붙도록
+  const PW = UH * 1.1;            // 사진 너비
+  const PH = UH * 1.1;            // 사진 높이
   const PX = -PW / 2;
   const PY = NECK_Y - PH;         // 사진 하단이 넥에 딱 붙음
 
@@ -632,7 +632,7 @@ function FormationPreview({
             href={photo}
             x={PX} y={PY}
             width={PW} height={PH}
-            preserveAspectRatio="xMidYMax meet"
+            preserveAspectRatio="xMidYMid meet"
           />
         ) : (
           <text
