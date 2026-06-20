@@ -654,37 +654,29 @@ function FormationPreview({
   };
 
   const gkPt = pts[0];
-  const svgRef = React.useRef<SVGSVGElement>(null);
+  const cardRef = React.useRef<HTMLDivElement>(null);
 
-  const handleSaveImage = () => {
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
-    const svgData = new XMLSerializer().serializeToString(svgEl);
-    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(svgBlob);
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const scale = 3; // 고해상도
-      canvas.width  = svgEl.viewBox.baseVal.width  * scale;
-      canvas.height = svgEl.viewBox.baseVal.height * scale;
-      const ctx = canvas.getContext("2d")!;
-      ctx.scale(scale, scale);
-      ctx.drawImage(img, 0, 0);
-      URL.revokeObjectURL(url);
-      canvas.toBlob(blob => {
-        if (!blob) return;
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `${teamName}_${formation}_포메이션.png`;
-        link.click();
-      }, "image/png");
-    };
-    img.src = url;
+  const handleSaveImage = async () => {
+    const el = cardRef.current;
+    if (!el) return;
+    // html2canvas로 DOM 그대로 캡처 (CSS 변수·사진 모두 반영)
+    const { default: html2canvas } = await import("html2canvas");
+    const canvas = await html2canvas(el, {
+      scale: 3,
+      useCORS: true,
+      backgroundColor: "#0D1016",
+    });
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${teamName}_${formation}_포메이션.png`;
+      link.click();
+    }, "image/png");
   };
 
   return (
-    <div className="formation-card">
+    <div className="formation-card" ref={cardRef}>
       <div className="formation-title" style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <span>
           {teamName}
@@ -701,7 +693,7 @@ function FormationPreview({
           title="포메이션 이미지 저장"
         >📷 저장</button>
       </div>
-      <svg ref={svgRef} viewBox="0 0 200 280" className="pitch">
+      <svg viewBox="0 0 200 280" className="pitch">
         {/* 피치 배경 */}
         <rect x="2" y="2" width="196" height="276" rx="6" fill="#0a1a0a" />
         <rect x="2" y="2" width="196" height="276" rx="6" fill="none" stroke="#2a3a2a" strokeWidth="1.2" />
