@@ -654,15 +654,54 @@ function FormationPreview({
   };
 
   const gkPt = pts[0];
+  const svgRef = React.useRef<SVGSVGElement>(null);
+
+  const handleSaveImage = () => {
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+    const svgData = new XMLSerializer().serializeToString(svgEl);
+    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const scale = 3; // 고해상도
+      canvas.width  = svgEl.viewBox.baseVal.width  * scale;
+      canvas.height = svgEl.viewBox.baseVal.height * scale;
+      const ctx = canvas.getContext("2d")!;
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => {
+        if (!blob) return;
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `${teamName}_${formation}_포메이션.png`;
+        link.click();
+      }, "image/png");
+    };
+    img.src = url;
+  };
 
   return (
     <div className="formation-card">
-      <div className="formation-title">
-        {teamName}
-        <span className="subtle"> ({team}) · {formation}</span>
-        <span style={{ display:"inline-block", width:10, height:10, borderRadius:3, background:ringColor, marginLeft:7, verticalAlign:"middle", opacity:.9 }} />
+      <div className="formation-title" style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <span>
+          {teamName}
+          <span className="subtle"> ({team}) · {formation}</span>
+          <span style={{ display:"inline-block", width:10, height:10, borderRadius:3, background:ringColor, marginLeft:7, verticalAlign:"middle", opacity:.9 }} />
+        </span>
+        <button
+          onClick={handleSaveImage}
+          style={{
+            background:"none", border:"1px solid var(--line)",
+            borderRadius:6, padding:"3px 9px", cursor:"pointer",
+            color:"var(--fg)", fontSize:11, display:"flex", alignItems:"center", gap:4
+          }}
+          title="포메이션 이미지 저장"
+        >📷 저장</button>
       </div>
-      <svg viewBox="0 0 200 280" className="pitch">
+      <svg ref={svgRef} viewBox="0 0 200 280" className="pitch">
         {/* 피치 배경 */}
         <rect x="2" y="2" width="196" height="276" rx="6" fill="#0a1a0a" />
         <rect x="2" y="2" width="196" height="276" rx="6" fill="none" stroke="#2a3a2a" strokeWidth="1.2" />
