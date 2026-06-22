@@ -1393,31 +1393,40 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
           if (gks.length <= 1) {
             teamBonus = teamBonusByTeam[team] || 0;
           } else {
-            // ✅ GK 2명일 때: 승리 횟수 -> 클린시트 -> 이름 순(동률이면 둘 다 4점)
+            // ✅ GK 2명 이상: 승리 횟수 → 클린시트 순으로 등수 산정
+            // 동률이면 같은 점수, 1등:4점 / 2등:2점 / 3등:1점
             const gkWinsCount = (Object as any).fromEntries(gks.map((id: string) => [id, gkWins[id] || 0]));
-            const gkCSCount = (Object as any).fromEntries(gks.map((id: string) => [id, asNumber(out[id]?.cleansheets, 0)]));
-            const sortedByWins = [...gks].sort((a, b) =>
+            const gkCSCount   = (Object as any).fromEntries(gks.map((id: string) => [id, asNumber(out[id]?.cleansheets, 0)]));
+
+            // 순위 점수표: 등수별 base 점수
+            const RANK_SCORES = [4, 2, 1]; // 1등, 2등, 3등(이하 동일)
+
+            // 정렬 후 그룹핑: 승리 동률 → 클린시트 동률이면 같은 그룹
+            const sorted = [...gks].sort((a, b) =>
               (gkWinsCount[b] - gkWinsCount[a]) ||
-              (gkCSCount[b] - gkCSCount[a]) ||
-              collator.compare(players.find(p => p.id === a)?.name || "", players.find(p => p.id === b)?.name || "")
+              (gkCSCount[b]   - gkCSCount[a])
             );
 
-            const top = sortedByWins[0];
-            const second = sortedByWins[1];
-            const topWins = gkWinsCount[top] || 0;
-            const secWins = gkWinsCount[second] || 0;
-            const topCS = gkCSCount[top] || 0;
-            const secCS = gkCSCount[second] || 0;
-
-            const tieWins = topWins === secWins;
-            const tieCS = topCS === secCS;
-            if (tieWins && tieCS) {
-              teamBonus = (pid === top || pid === second) ? 4 : 0;
-            } else {
-              teamBonus = top === pid ? 4 : second === pid ? 2 : 0;
+            // 각 GK에게 등수 점수 부여 (동률이면 같은 점수)
+            const gkScore: Record<string, number> = {};
+            let i = 0;
+            while (i < sorted.length) {
+              const cur_id = sorted[i];
+              // 같은 그룹 찾기 (승리·클린시트 모두 동일)
+              let j = i + 1;
+              while (
+                j < sorted.length &&
+                gkWinsCount[sorted[j]] === gkWinsCount[cur_id] &&
+                gkCSCount[sorted[j]]   === gkCSCount[cur_id]
+              ) j++;
+              // i~j-1 범위가 동률 그룹 → 그룹 내 최고 등수 점수 부여
+              const rankScore = RANK_SCORES[Math.min(i, RANK_SCORES.length - 1)];
+              for (let k = i; k < j; k++) gkScore[sorted[k]] = rankScore;
+              i = j;
             }
+
+            teamBonus = gkScore[pid] ?? 0;
           }
-        } else {
           teamBonus = teamBonusByTeam[team] || 0;
         }
       }
