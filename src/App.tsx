@@ -1427,6 +1427,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
 
             teamBonus = gkScore[pid] ?? 0;
           }
+        } else {
           teamBonus = teamBonusByTeam[team] || 0;
         }
       }
