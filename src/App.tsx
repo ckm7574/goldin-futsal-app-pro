@@ -50,6 +50,7 @@ type Session = {
   matches: Match[];
   matchStats: Record<string, MatchStats>;
   defAwards: Record<TeamId, string | string[] | null>;
+  gkAward?: string | null;            // 키퍼상: 전체 GK 중 1명 선택
   teamNames?: Record<TeamId, string>;
   notes: string;
   hasTeamD?: boolean;
@@ -330,6 +331,7 @@ function emptySession(): Session {
     matches: [],
     matchStats: {},
     defAwards: { A: null, B: null, C: null, D: null },
+    gkAward: null,
     teamNames: undefined,
     notes: "",
     hasTeamD: false,
@@ -421,7 +423,9 @@ const teamNames = (s?.teamNames && typeof s.teamNames === "object")
         });
       }
 
-      sessionsByDate[ensureSunday(k)] = { rosters, matches, matchStats, defAwards, teamNames, notes, rosterViewConfirmed, formations, posOverrides };
+      const gkAward: string | null = (typeof s?.gkAward === "string" && s.gkAward) ? s.gkAward : null;
+
+      sessionsByDate[ensureSunday(k)] = { rosters, matches, matchStats, defAwards, teamNames, notes, rosterViewConfirmed, formations, posOverrides, gkAward };
     }
   } else {
     sessionsByDate[today] = emptySession();
@@ -1277,6 +1281,11 @@ const setDefNew = (tid: TeamId, slot: 0 | 1, pid: string | null) => {
 
 const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
 
+const setGkAward = (pid: string | null) => {
+  if (readonly) return;
+  patchSession({ gkAward: pid });
+};
+
   const setMatchStat = (mid: string, pid: string, field: "goals" | "assists", value: number) => {
     if (readonly) return;
     const row = { ...(cur.matchStats?.[mid] || {}) } as MatchStats;
@@ -1432,10 +1441,14 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
         }
       }
 
-      const total = out[pid].goals + out[pid].assists + out[pid].cleansheets + def + teamBonus;
+      // 키퍼상 +1점 (gkAward로 선택된 선수)
+      const gkAwardPid = session.gkAward ? (resolvePid(session.gkAward) || session.gkAward) : null;
+      const gkAwardPoint = (gkAwardPid === pid) ? 1 : 0;
+
+      const total = out[pid].goals + out[pid].assists + out[pid].cleansheets + def + teamBonus + gkAwardPoint;
       out[pid] = {
         ...out[pid],
-        def, teamBonus, total,
+        def, teamBonus, gkAwardPoint, total,
         name: players.find(p => p.id === pid)?.name || "?",
         team,
         teamName: team === "-" ? "-" : teamNamesUse[team]
@@ -1535,16 +1548,18 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
       const present = new Set<string>();
       TEAM_IDS.forEach(t => asArray(s.rosters[t], []).forEach(pid => present.add(pid)));
       Object.entries(sc).forEach(([pid, v]: any) => {
-        const b = agg[pid] || { goals: 0, assists: 0, cleansheets: 0, def: 0, teamBonus: 0, total: 0, days: 0, name: v.name, teamName: v.teamName, _dates: [] as string[] };
+        const b = agg[pid] || { goals: 0, assists: 0, cleansheets: 0, def: 0, teamBonus: 0, gkAwardPoint: 0, total: 0, days: 0, name: v.name, teamName: v.teamName, _dates: [] as string[] };
         agg[pid] = {
           ...b,
           goals: b.goals + v.goals, assists: b.assists + v.assists, cleansheets: b.cleansheets + v.cleansheets,
-          def: b.def + v.def, teamBonus: b.teamBonus + v.teamBonus, total: b.total + v.total,
+          def: b.def + v.def, teamBonus: b.teamBonus + v.teamBonus,
+          gkAwardPoint: (b.gkAwardPoint || 0) + (v.gkAwardPoint || 0),
+          total: b.total + v.total,
           days: b.days + (present.has(pid) ? 1 : 0),
           _dates: [...b._dates, dateKey]
         };
       });
-      present.forEach(pid => { if (!agg[pid]) agg[pid] = { goals: 0, assists: 0, def: 0, teamBonus: 0, total: 0, days: 1, name: "?", teamName: "", _dates: [dateKey] }; });
+      present.forEach(pid => { if (!agg[pid]) agg[pid] = { goals: 0, assists: 0, def: 0, teamBonus: 0, gkAwardPoint: 0, total: 0, days: 1, name: "?", teamName: "", _dates: [dateKey] }; });
     });
     return agg;
   }, [sessionsByDate, players, globalTeamNames]);
@@ -1568,16 +1583,18 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
       const present = new Set<string>();
       TEAM_IDS.forEach(t => asArray(s.rosters[t], []).forEach(pid => present.add(pid)));
       Object.entries(sc).forEach(([pid, v]: any) => {
-        const b = agg[pid] || { goals: 0, assists: 0, cleansheets: 0, def: 0, teamBonus: 0, total: 0, days: 0, name: v.name, teamName: v.teamName, _dates: [] as string[] };
+        const b = agg[pid] || { goals: 0, assists: 0, cleansheets: 0, def: 0, teamBonus: 0, gkAwardPoint: 0, total: 0, days: 0, name: v.name, teamName: v.teamName, _dates: [] as string[] };
         agg[pid] = {
           ...b,
           goals: b.goals + v.goals, assists: b.assists + v.assists, cleansheets: b.cleansheets + v.cleansheets,
-          def: b.def + v.def, teamBonus: b.teamBonus + v.teamBonus, total: b.total + v.total,
+          def: b.def + v.def, teamBonus: b.teamBonus + v.teamBonus,
+          gkAwardPoint: (b.gkAwardPoint || 0) + (v.gkAwardPoint || 0),
+          total: b.total + v.total,
           days: b.days + (present.has(pid) ? 1 : 0),
           _dates: [...b._dates, dateKey]
         };
       });
-      present.forEach(pid => { if (!agg[pid]) agg[pid] = { goals: 0, assists: 0, def: 0, teamBonus: 0, total: 0, days: 1, name: "?", teamName: "", _dates: [dateKey] }; });
+      present.forEach(pid => { if (!agg[pid]) agg[pid] = { goals: 0, assists: 0, def: 0, teamBonus: 0, gkAwardPoint: 0, total: 0, days: 1, name: "?", teamName: "", _dates: [dateKey] }; });
     });
     return agg;
   }, [filteredSessionEntries, players, globalTeamNames]);
@@ -1935,6 +1952,31 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                 );
               })}
             </div>
+
+            {/* 🧤 키퍼상: 전체 GK 포지션 선수 중 1명 선택 */}
+            {matchesSorted.length > 0 && (
+              <div className="row" style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--line)", alignItems: "center", gap: 10 }}>
+                <label style={{ marginRight: 4, fontWeight: 600 }}>🧤 키퍼상</label>
+                <select
+                  value={cur.gkAward || ""}
+                  onChange={e => setGkAward(e.target.value || null)}
+                  disabled={readonly}
+                >
+                  <option value="">(선택 없음)</option>
+                  {TEAM_IDS.filter(tid => getActiveTeamsSafe(cur).includes(tid))
+                    .flatMap(tid =>
+                      asArray<string>((cur.rosters as Record<TeamId, string[]>)[tid], [])
+                        .filter(pid => posOf(pid, cur) === "GK")
+                        .map(pid => {
+                          const name = players.find(p => p.id === pid)?.name || pid;
+                          return <option key={pid} value={pid}>{name} ({effectiveTeamNames[tid]})</option>;
+                        })
+                    )
+                  }
+                </select>
+                <span className="hint">+1점</span>
+              </div>
+            )}
           </section>
 
           {/* 경기/표/개인순위 섹션들은 기존 그대로 */}
@@ -1970,7 +2012,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
             <h3>오늘의 개인 순위</h3>
             <div className="table-wrap">
               <table className="tbl"><thead><tr>
-                <th>순위</th><th>선수</th><th>팀명</th><th>G</th><th>A</th><th>CS</th><th>수비</th><th>팀</th><th>총점</th>
+                <th>순위</th><th>선수</th><th>팀명</th><th>G</th><th>A</th><th>CS</th><th>수비</th><th>키퍼</th><th>팀</th><th>총점</th>
               </tr></thead><tbody>
                 {sortedDaily.map((r: any, idx: number) => (
                   <tr key={r.id}>
@@ -1981,6 +2023,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                     <td>{r.assists || 0}</td>
                     <td>{r.cleansheets || 0}</td>
                     <td>{r.def || 0}</td>
+                    <td>{r.gkAwardPoint || 0}</td>
                     <td>{r.teamBonus || 0}</td>
                     <td className="bold">{r.total || 0}</td>
                   </tr>
@@ -2097,6 +2140,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                 >
                   팀{overallSortKey === "teamBonus" ? (overallSortDir === "desc" ? " ▼" : " ▲") : ""}
                 </th>
+                <th>키퍼</th>
                 <th
                   style={{ cursor: "pointer", userSelect: "none" }}
                   onClick={() => {
@@ -2131,6 +2175,7 @@ const isNewDefRule = isoOnOrAfter(sessionDate, DEF_AWARD_RULE_CUTOFF_ISO);
                   <td>{r.cleansheets}</td>
                   <td>{r.def}</td>
                   <td>{r.teamBonus}</td>
+                  <td>{r.gkAwardPoint || 0}</td>
                   <td className="bold">{r.total}</td>
                   <td>{r.average}</td>
                 </tr>
