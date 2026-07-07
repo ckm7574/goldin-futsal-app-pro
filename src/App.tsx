@@ -1703,38 +1703,71 @@ const setGkAward = (pid: string | null) => {
     <div className="wrap" data-theme={theme}>
 
       {/* ===== 월드컵 테마 전용 헤더 ===== */}
-      {theme === "worldcup" && (
-        <div className="wc-hero">
-          {/* 흐르는 국기 띠 */}
-          <div className="wc-flags-track">
-            <div className="wc-flags-inner">
-              {["🇺🇸","🇲🇽","🇨🇦","🇧🇷","🇦🇷","🇩🇪","🇫🇷","🇪🇸","🇵🇹","🇮🇹","🇬🇧","🇳🇱","🇧🇪","🇨🇷","🇯🇵","🇰🇷","🇦🇺","🇲🇦","🇸🇳","🇳🇬","🇨🇱","🇨🇴","🇵🇪","🇺🇾","🇨🇭","🇸🇪","🇩🇰","🇵🇱","🇭🇷","🇷🇸",
-                "🇺🇸","🇲🇽","🇨🇦","🇧🇷","🇦🇷","🇩🇪","🇫🇷","🇪🇸","🇵🇹","🇮🇹","🇬🇧","🇳🇱","🇧🇪","🇨🇷","🇯🇵","🇰🇷","🇦🇺","🇲🇦","🇸🇳","🇳🇬","🇨🇱","🇨🇴","🇵🇪","🇺🇾","🇨🇭","🇸🇪","🇩🇰","🇵🇱","🇭🇷","🇷🇸"
-              ].map((f, i) => <span key={i} className="wc-flag">{f}</span>)}
-            </div>
-          </div>
+      {theme === "worldcup" && (() => {
+        // flagcdn.com 2글자 ISO 코드 → 국기 이미지 URL
+        const flagUrl = (code: string) =>
+          `https://flagcdn.com/w40/${code.toLowerCase()}.png`;
 
-          {/* 메인 히어로 */}
-          <div className="wc-hero-body">
-            <div className="wc-trophy">🏆</div>
-            <div className="wc-hero-text">
-              <div className="wc-year">FIFA WORLD CUP 2026™</div>
-              <h1 className="wc-title">골딘 풋살 리그</h1>
-              <div className="wc-subtitle">USA · CANADA · MEXICO &nbsp;|&nbsp; 2026.06.11 – 07.19</div>
-            </div>
-            <div className="wc-trophy wc-trophy-r">⚽</div>
-          </div>
+        const row1: [string, string][] = [
+          ["us","USA"],["mx","MEX"],["ca","CAN"],["br","BRA"],["ar","ARG"],
+          ["de","GER"],["fr","FRA"],["es","ESP"],["pt","POR"],["it","ITA"],
+          ["gb","ENG"],["nl","NED"],["be","BEL"],["cr","CRC"],["jp","JPN"],
+          ["kr","KOR"],["au","AUS"],["ma","MAR"],["sn","SEN"],["ng","NGA"],
+          ["cl","CHI"],["co","COL"],["pe","PER"],["uy","URU"],["ch","SUI"],
+          ["se","SWE"],["dk","DEN"],["pl","POL"],["hr","CRO"],["rs","SRB"],
+        ];
+        const row2: [string, string][] = [
+          ["pt","POR"],["de","GER"],["fr","FRA"],["br","BRA"],["ar","ARG"],
+          ["es","ESP"],["jp","JPN"],["kr","KOR"],["ma","MAR"],["us","USA"],
+          ["mx","MEX"],["ca","CAN"],["be","BEL"],["nl","NED"],["co","COL"],
+          ["cl","CHI"],["au","AUS"],["se","SWE"],["pl","POL"],["sn","SEN"],
+          ["uy","URU"],["it","ITA"],["gb","ENG"],["ng","NGA"],["cr","CRC"],
+          ["dk","DEN"],["ch","SUI"],["hr","CRO"],["rs","SRB"],["pe","PER"],
+        ];
+        const FlagItem = ({ code, name }: { code: string; name: string }) => (
+          <span className="wc-flag">
+            <img
+              src={flagUrl(code)}
+              alt={name}
+              width={40}
+              height={27}
+              loading="lazy"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+            <span className="wc-flag-label">{name}</span>
+          </span>
+        );
+        // 무한스크롤: 두 벌 복제
+        const makeRow = (arr: [string, string][]) =>
+          [...arr, ...arr].map(([code, name], i) => (
+            <FlagItem key={`${code}-${i}`} code={code} name={name} />
+          ));
 
-          {/* 하단 국기 띠 (반대방향) */}
-          <div className="wc-flags-track wc-flags-track-rev">
-            <div className="wc-flags-inner wc-flags-inner-rev">
-              {["🇵🇹","🇩🇪","🇫🇷","🇧🇷","🇦🇷","🇪🇸","🇯🇵","🇰🇷","🇲🇦","🇺🇸","🇲🇽","🇨🇦","🇧🇪","🇳🇱","🇨🇴","🇨🇱","🇦🇺","🇸🇪","🇵🇱","🇸🇳","🇺🇾","🇮🇹","🇬🇧","🇳🇬","🇨🇷","🇩🇰","🇨🇭","🇭🇷","🇷🇸","🇵🇪",
-                "🇵🇹","🇩🇪","🇫🇷","🇧🇷","🇦🇷","🇪🇸","🇯🇵","🇰🇷","🇲🇦","🇺🇸","🇲🇽","🇨🇦","🇧🇪","🇳🇱","🇨🇴","🇨🇱","🇦🇺","🇸🇪","🇵🇱","🇸🇳","🇺🇾","🇮🇹","🇬🇧","🇳🇬","🇨🇷","🇩🇰","🇨🇭","🇭🇷","🇷🇸","🇵🇪"
-              ].map((f, i) => <span key={i} className="wc-flag">{f}</span>)}
+        return (
+          <div className="wc-hero">
+            {/* 상단 국기 띠 */}
+            <div className="wc-flags-track">
+              <div className="wc-flags-inner">{makeRow(row1)}</div>
+            </div>
+
+            {/* 메인 히어로 */}
+            <div className="wc-hero-body">
+              <div className="wc-trophy">🏆</div>
+              <div className="wc-hero-text">
+                <div className="wc-year">FIFA WORLD CUP 2026™</div>
+                <h1 className="wc-title">골딘 풋살 리그</h1>
+                <div className="wc-subtitle">USA · CANADA · MEXICO &nbsp;|&nbsp; 2026.06.11 – 07.19</div>
+              </div>
+              <div className="wc-trophy wc-trophy-r">⚽</div>
+            </div>
+
+            {/* 하단 국기 띠 (역방향) */}
+            <div className="wc-flags-track wc-flags-track-rev">
+              <div className="wc-flags-inner wc-flags-inner-rev">{makeRow(row2)}</div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {theme !== "worldcup" && <h1 className="title">골딘 풋살 리그 · 기록/집계</h1>}
 
@@ -2526,18 +2559,37 @@ const setGkAward = (pid: string | null) => {
         }
         .wc-flags-inner {
           display: flex;
-          gap: 6px;
+          align-items: center;
+          gap: 0px;
           width: max-content;
-          animation: wc-scroll 28s linear infinite;
+          animation: wc-scroll 32s linear infinite;
           will-change: transform;
         }
         .wc-flags-inner-rev {
-          animation: wc-scroll-rev 22s linear infinite;
+          animation: wc-scroll-rev 26s linear infinite;
         }
         .wc-flag {
-          font-size: 22px;
-          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 3px 10px;
+          border-right: 1px solid rgba(255,255,255,.08);
           user-select: none;
+          flex-shrink: 0;
+        }
+        .wc-flag img {
+          display: block;
+          border-radius: 2px;
+          box-shadow: 0 1px 4px rgba(0,0,0,.5);
+          object-fit: cover;
+          width: 36px;
+          height: 24px;
+        }
+        .wc-flag-label {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: .5px;
+          color: #c8d4f0;
         }
 
         /* 히어로 본문 */
