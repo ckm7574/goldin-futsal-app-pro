@@ -965,6 +965,14 @@ useEffect(() => { (async () => {
   } catch {}
 })(); }, []);
 const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
+  const [theme, setTheme] = useState<"goldin" | "worldcup">(() =>
+    (localStorage.getItem("app-theme") as "goldin" | "worldcup") || "goldin"
+  );
+  const toggleTheme = () => {
+    const next = theme === "goldin" ? "worldcup" : "goldin";
+    setTheme(next);
+    localStorage.setItem("app-theme", next);
+  };
   // ===== 전체 순위/랭킹 보드 필터(시즌/기간) & 정렬 =====
   type StatsFilterMode = "all" | "season" | "range";
 
@@ -1692,8 +1700,8 @@ const setGkAward = (pid: string | null) => {
   }, [sortedCumulative]);
 
   return (
-    <div className="wrap">
-      <h1 className="title">골딘 풋살 리그 · 기록/집계</h1>
+    <div className="wrap" data-theme={theme}>
+      <h1 className="title">{theme === "worldcup" ? "⚽ 2026 북중미 월드컵 · 골딘 풋살" : "골딘 풋살 리그 · 기록/집계"}</h1>
 
       <div className="panel">
         {viewerFlag && <span className="badge-view">보기 전용 링크</span>}
@@ -1708,6 +1716,25 @@ const setGkAward = (pid: string | null) => {
           <button onClick={unlock}>잠금 해제</button>
           <button onClick={copyViewerLink}>보기 전용 링크 복사</button>
         </>}
+        {/* 테마 토글 */}
+        <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+          <button
+            onClick={() => { setTheme("goldin"); localStorage.setItem("app-theme", "goldin"); }}
+            style={{ fontSize: 12, padding: "5px 10px",
+              background: theme === "goldin" ? "var(--gold)" : undefined,
+              color: theme === "goldin" ? "#1a1a1a" : undefined,
+              borderColor: theme === "goldin" ? "var(--gold)" : undefined,
+              fontWeight: theme === "goldin" ? 700 : undefined }}
+          >골딘</button>
+          <button
+            onClick={() => { setTheme("worldcup"); localStorage.setItem("app-theme", "worldcup"); }}
+            style={{ fontSize: 12, padding: "5px 10px",
+              background: theme === "worldcup" ? "#C8102E" : undefined,
+              color: theme === "worldcup" ? "#fff" : undefined,
+              borderColor: theme === "worldcup" ? "#C8102E" : undefined,
+              fontWeight: theme === "worldcup" ? 700 : undefined }}
+          >🌍 월드컵</button>
+        </div>
       </div>
 
       <div className="tabs">
@@ -2351,6 +2378,128 @@ const setGkAward = (pid: string | null) => {
           --jersey-green:#4CAF50;
           --jersey-stroke:#0a0b0f;
         }
+
+        /* ===== 2026 북중미 월드컵 테마 ===== */
+        /* 공식 컬러: 빨강(#C8102E) · 흰(#FFFFFF) · 금(#D4A017) · 남색(#002868) */
+        [data-theme="worldcup"] {
+          --gold: #D4A017;
+          --gold-2: #C8102E;
+          --emblem-word: #FFFFFF;
+          --bg: #05070D;
+          --card: #0B0F1C;
+          --line: #1E2A45;
+          --text: #F0F4FF;
+          --muted: #8899BB;
+        }
+        [data-theme="worldcup"] body { background: var(--bg); }
+
+        /* 배경 그라디언트 — 경기장 잔디+밤하늘 느낌 */
+        [data-theme="worldcup"] .wrap {
+          background: linear-gradient(160deg, #05070D 0%, #071022 60%, #0A1A0A 100%);
+          min-height: 100vh;
+        }
+
+        /* 타이틀 — 월드컵 레드+골드 그라디언트 */
+        [data-theme="worldcup"] .title {
+          background: linear-gradient(90deg, #C8102E 0%, #D4A017 50%, #FFFFFF 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          font-size: 24px;
+          letter-spacing: .5px;
+        }
+
+        /* 패널 */
+        [data-theme="worldcup"] .panel {
+          background: linear-gradient(180deg, #0D1428 0%, #07091A 100%);
+          border-color: #1E2A45;
+        }
+
+        /* 탭 */
+        [data-theme="worldcup"] .tab { background: #0B0F1C; border-color: #1E2A45; color: #F0F4FF; }
+        [data-theme="worldcup"] .tab:hover { border-color: #C8102E; }
+        [data-theme="worldcup"] .tab.active { background: #C8102E; color: #fff; border-color: #C8102E; }
+
+        /* 섹션 박스 */
+        [data-theme="worldcup"] .box {
+          background: #0B0F1C;
+          border-color: #1E2A45;
+          box-shadow: 0 2px 16px rgba(200,16,46,0.08);
+        }
+        [data-theme="worldcup"] .box h3 {
+          color: #D4A017;
+          border-bottom: 1px solid #C8102E33;
+          padding-bottom: 6px;
+        }
+
+        /* 팀 카드 */
+        [data-theme="worldcup"] .team-card { background: #0D1220; border-color: #1E2A45; }
+        [data-theme="worldcup"] .team-col { background: #0A0F1C; border-color: #1E2A45; }
+        [data-theme="worldcup"] .team-col-head { color: #D4A017; }
+
+        /* 테이블 */
+        [data-theme="worldcup"] .table-wrap { background: #080C18; border-color: #1E2A45; }
+        [data-theme="worldcup"] .tbl th { background: #0D1530; color: #D4A017; border-bottom: 2px solid #C8102E44; }
+        [data-theme="worldcup"] .tbl th, [data-theme="worldcup"] .tbl td { border-bottom-color: #1A2440; }
+        [data-theme="worldcup"] .bold { color: #D4A017; }
+
+        /* 입력/버튼 */
+        [data-theme="worldcup"] input, [data-theme="worldcup"] select,
+        [data-theme="worldcup"] textarea {
+          background: #080C18; border-color: #1E2A45; color: #F0F4FF;
+        }
+        [data-theme="worldcup"] button {
+          background: #0D1228; border-color: #1E2A45; color: #F0F4FF;
+        }
+        [data-theme="worldcup"] button:hover {
+          border-color: #C8102E;
+          box-shadow: 0 0 0 2px rgba(200,16,46,0.12) inset;
+        }
+
+        /* 카드 */
+        [data-theme="worldcup"] .card { background: #0D1220; border-color: #1E2A45; }
+        [data-theme="worldcup"] .list-scroll { background: #080C18; border-color: #1E2A45; }
+
+        /* 선수 스탯 카드 */
+        [data-theme="worldcup"] .player-stat-card {
+          background: linear-gradient(135deg, #0D1428, #14192E);
+          border-color: #C8102E66;
+          box-shadow: 0 0 20px rgba(200,16,46,0.12);
+        }
+        [data-theme="worldcup"] .player-stat-photo { border-color: #C8102E; box-shadow: 0 0 12px rgba(200,16,46,0.4); }
+        [data-theme="worldcup"] .player-stat-photo-placeholder { border-color: #C8102E66; color: #D4A017; background: linear-gradient(135deg,#1A1F35,#0F1428); }
+        [data-theme="worldcup"] .player-stat-team { color: #D4A017; background: rgba(212,160,23,0.12); border-color: rgba(212,160,23,0.3); }
+        [data-theme="worldcup"] .player-stat-total b { color: #D4A017; }
+
+        /* 랭킹 보드 */
+        [data-theme="worldcup"] .rank-card { background: #0D1228; border-color: #1E2A45; }
+        [data-theme="worldcup"] .rank-card .player-score { color: #D4A017; }
+        [data-theme="worldcup"] .rank-card.rank-1 { border-color: #D4A017; background: #12182E; box-shadow: 0 0 0 1px rgba(212,160,23,.25) inset; }
+
+        /* badge-gk */
+        [data-theme="worldcup"] .badge-gk { border-color: #C8102E88; color: #FF6680; }
+
+        /* ok(관리자) */
+        [data-theme="worldcup"] .ok { color: #D4A017; }
+
+        /* 포메이션 카드 */
+        [data-theme="worldcup"] .formation-card { background: #060A14; border-color: #1E2A45; }
+
+        /* 선수 관리 */
+        [data-theme="worldcup"] .player-admin-item { background: #080C18; border-color: #1E2A45; }
+        [data-theme="worldcup"] .player-card { background: #080C18; border-color: #1E2A45; }
+        [data-theme="worldcup"] .player-photo-upload { border-color: #C8102E88; background: #0D1220; }
+        [data-theme="worldcup"] .player-photo-upload:hover { border-color: #C8102E; }
+        [data-theme="worldcup"] .player-photo-placeholder { color: #D4A017; }
+
+        /* score-input */
+        [data-theme="worldcup"] .score-input { background: #080C18; border-color: #1E2A45; color: #F0F4FF; }
+        [data-theme="worldcup"] .stat-input { background: #080C18; border-color: #1E2A45; color: #F0F4FF; }
+        [data-theme="worldcup"] .seq { color: #D4A017; }
+
+        /* 푸터 */
+        [data-theme="worldcup"] .footer { color: #3A4A6A; }
+        [data-theme="worldcup"] .subtle { color: #607090; }
         *, *::before, *::after { box-sizing: border-box; }
         body { background: var(--bg); }
 
