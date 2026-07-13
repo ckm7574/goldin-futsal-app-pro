@@ -1919,6 +1919,48 @@ const setGkAward = (pid: string | null) => {
                 });
               }}>+ 팀 추가</button>
             )}
+            {cur?.hasTeamD && !readonly && (() => {
+              const dMatchCount = asArray<Match>(cur.matches, []).filter(
+                m => m.home === "D" || m.away === "D"
+              ).length;
+              return (
+                <button
+                  onClick={() => {
+                    if (dMatchCount > 0) {
+                      if (!window.confirm(
+                        `흰색 팀이 포함된 경기가 ${dMatchCount}개 있습니다.\n경기 기록은 유지되지만 흰색 팀 로스터는 초기화됩니다.\n정말 삭제하시겠습니까?`
+                      )) return;
+                    } else {
+                      if (!window.confirm("흰색 팀(D팀)을 삭제하시겠습니까?")) return;
+                    }
+                    const key = ensureSunday(sessionDate);
+                    setSessionsByDate(prev => {
+                      const base = { ...(prev[key] ?? emptySession()) };
+                      base.hasTeamD = false;
+                      base.rosters = { ...base.rosters, D: [] };
+                      base.defAwards = { ...base.defAwards, D: null };
+                      base.rosterViewConfirmed = {
+                        A: base.rosterViewConfirmed?.A ?? false,
+                        B: base.rosterViewConfirmed?.B ?? false,
+                        C: base.rosterViewConfirmed?.C ?? false,
+                        D: false,
+                      } as Record<TeamId, boolean>;
+                      return { ...prev, [key]: base };
+                    });
+                  }}
+                  style={{
+                    background: "#2a0808",
+                    borderColor: "#6b1e1e",
+                    color: "#ff8a8a",
+                    fontSize: 13,
+                    padding: "5px 12px",
+                    marginLeft: 4,
+                  }}
+                >
+                  🗑 흰색 팀 삭제{dMatchCount > 0 ? ` (경기 ${dMatchCount}건 포함)` : ""}
+                </button>
+              );
+            })()}
             <div className="teams-grid">
               {getActiveTeamsSafe(typeof cur !== "undefined" ? cur : undefined).map(tid => {
                 const isConfirmed = Boolean(cur.rosterViewConfirmed?.[tid]);
