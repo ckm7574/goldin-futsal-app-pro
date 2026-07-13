@@ -581,7 +581,8 @@ function FormationPreview({
     color === "red"    ? "#E74C3C" :
     color === "yellow" ? "#F1C40F" :
     color === "green"  ? "#4CAF50" : "#EAEAEA";
-  const labelColor = color === "yellow" ? "#1a1a1a" : "#ffffff";
+  const labelColor = (color === "yellow" || color === "white") ? "#1a1a1a" : "#ffffff";
+  const labelStroke = (color === "yellow" || color === "white") ? "#ffffff" : "black";
 
   const jerseyFill =
     color === "red"    ? "var(--jersey-red)"    :
@@ -643,13 +644,13 @@ function FormationPreview({
           />
         )}
 
-        {/* ③ 이름/용병/GK — 유니폼 안, 흰 글씨 + 검정 음각 테두리 */}
+        {/* ③ 이름/용병/GK — 유니폼 안, 유니폼 색에 따라 대비되는 글씨색 */}
         <text
           x={0} y={NAME_Y}
           dominantBaseline="middle" textAnchor="middle"
-          fill="white"
+          fill={labelColor}
           fontSize="10" fontWeight="800"
-          stroke="black" strokeWidth="2"
+          stroke={labelStroke} strokeWidth="2"
           paintOrder="stroke"
           style={{ fontFamily: "inherit" }}
         >{displayName}</text>
@@ -2486,6 +2487,7 @@ const setGkAward = (pid: string | null) => {
           --jersey-red:#E74C3C;
           --jersey-yellow:#F1C40F;
           --jersey-green:#4CAF50;
+          --jersey-white:#EAEAEA;
           --jersey-stroke:#0a0b0f;
         }
 
