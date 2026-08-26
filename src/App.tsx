@@ -1846,8 +1846,8 @@ const setGkAward = (pid: string | null) => {
         <button className={page === 1 ? "tab active" : "tab"} onClick={() => setPage(1)}>선수 관리</button>
         <button className={page === 2 ? "tab active" : "tab"} onClick={() => setPage(2)}>일자별 경기 기록</button>
         <button className={page === 3 ? "tab active" : "tab"} onClick={() => setPage(3)}>전체 순위</button>
-        <button className={page === 4 ? "tab active" : "tab"} onClick={() => setPage(4)}>선수 분석</button>
         <button className={page === 5 ? "tab active" : "tab"} onClick={() => setPage(5)}>랭킹 보드</button>
+        <button className={page === 4 ? "tab active" : "tab"} onClick={() => setPage(4)}>선수 분석</button>
       </nav>
 
       {page === 2 && (
@@ -1940,7 +1940,8 @@ const setGkAward = (pid: string | null) => {
       {page === 2 && (
         <>
           <section className="box">
-            <h3>팀 구성</h3>
+            <div className="team-compose-head">
+              <h3>팀 구성</h3>
             {!cur?.hasTeamD && (
               <button className="btn add-team" onClick={() => {
                 if (readonly) return;
@@ -1998,6 +1999,7 @@ const setGkAward = (pid: string | null) => {
                 </button>
               );
             })()}
+            </div>
             <div className="teams-grid">
               {getActiveTeamsSafe(typeof cur !== "undefined" ? cur : undefined).map(tid => {
                 const isConfirmed = Boolean(cur.rosterViewConfirmed?.[tid]);
@@ -3088,6 +3090,14 @@ const setGkAward = (pid: string | null) => {
         }
         .box h4 { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
         .hidden { display:none; }
+
+        /* 팀 구성 헤더: 제목 + 팀 추가/삭제 버튼을 한 줄로 */
+        .team-compose-head {
+          display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+          margin: 0 0 12px;
+        }
+        .team-compose-head h3 { margin: 0; }
+        .team-compose-head .add-team { padding: 5px 12px; font-size: 13px; }
 
         .teams-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; }
         .team-card {
