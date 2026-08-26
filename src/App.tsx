@@ -3135,15 +3135,20 @@ const setGkAward = (pid: string | null) => {
         .stat-input { width:64px; height:42px; padding:6px 8px; border:1px solid var(--line); border-radius: var(--r-sm); text-align:center; font-size:15px; font-weight: 600; background: var(--bg-2); color: var(--text); }
         .stat-input.select { width:64px; height:42px; }
 
-        input, select, textarea, button {
+        input:not([type="checkbox"]):not([type="radio"]), select, textarea, button {
           padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-sm);
           background: var(--bg-2); color: var(--text); font-size:16px;
           font-family: inherit; letter-spacing: -.01em;
           transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background var(--dur) var(--ease), transform .1s var(--ease);
           -webkit-appearance: none; appearance: none;
         }
+        /* 체크박스/라디오는 네이티브 렌더 유지 (체크 표시 보이게) */
+        input[type="checkbox"], input[type="radio"] {
+          -webkit-appearance: auto; appearance: auto;
+          accent-color: var(--accent);
+        }
         input::placeholder, textarea::placeholder { color: var(--muted-2); }
-        input:focus, select:focus, textarea:focus {
+        input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus {
           outline: none; border-color: var(--accent);
           box-shadow: 0 0 0 3px var(--accent-soft);
           background: var(--card);
