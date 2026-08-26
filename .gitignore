@@ -5,5 +5,10 @@ dist
 *.log
 .DS_Store
 shot*.py
+*_preview.py
 current_*.png
 preview_*.png
+mob_*.png
+pc_*.png
+rp_*.png
+sp_*.png

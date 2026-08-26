@@ -716,8 +716,8 @@ function FormationPreview({
           <PlayerNode key={i} pid={chosenFields[i] ?? null} cx={pt.x} cy={pt.y} />
         ))}
 
-        {/* GK */}
-        <PlayerNode pid={singleGK} cx={gkPt.x} cy={gkPt.y} isGK />
+        {/* GK — 골키퍼가 선택된 경우에만 유니폼 표시 */}
+        {singleGK && <PlayerNode pid={singleGK} cx={gkPt.x} cy={gkPt.y} isGK />}
       </svg>
     </div>
   );
@@ -2484,11 +2484,16 @@ const setGkAward = (pid: string | null) => {
               <div className="rank-cards">
                 {top5Ranking(cat.key as any).map((p) => (
                   <div key={p.id} className={`rank-card rank-${p.rank}`}>
-                    <span className="rank-badge">{p.rank}</span>
+                    <span className="rank-badge">
+                      {p.rank === 1 ? "🥇" : p.rank === 2 ? "🥈" : p.rank === 3 ? "🥉" : p.rank}
+                    </span>
                     <span className="player-name">{p.name}</span>
                     <span className="player-score">{(p as any)[cat.key]}</span>
                   </div>
                 ))}
+                {top5Ranking(cat.key as any).length === 0 && (
+                  <div className="rank-empty">기록 없음</div>
+                )}
               </div>
             </div>
           ))}
@@ -2843,21 +2848,38 @@ const setGkAward = (pid: string | null) => {
         }
         [data-theme="worldcup"] .player-stat-total b { color: #D4A017; }
 
-        /* ---------- 랭킹 보드 ---------- */
+        /* ---------- 랭킹 보드 (월드컵 테마) ---------- */
+        [data-theme="worldcup"] .ranking-grid .ranking-section {
+          background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0));
+          border-color: #1A2640;
+        }
+        [data-theme="worldcup"] .ranking-section h4 { border-bottom-color: #1A2640; }
         [data-theme="worldcup"] .rank-card {
           background: #0C1228; border-color: #1A2640;
-          transition: box-shadow .2s;
         }
-        [data-theme="worldcup"] .rank-card:hover {
-          box-shadow: 0 0 12px rgba(200,16,46,.18);
-        }
-        [data-theme="worldcup"] .rank-card .player-score { color: #D4A017; }
+        [data-theme="worldcup"] .rank-card .rank-badge { background: rgba(255,255,255,.05); color:#9AA7C4; }
+        [data-theme="worldcup"] .rank-card .player-score { color: #EEF2FF; }
+        [data-theme="worldcup"] .rank-empty { color:#6E7CA0; }
+
         [data-theme="worldcup"] .rank-card.rank-1 {
           border-color: #D4A017;
-          background: linear-gradient(135deg, #14192E, #0F1428);
-          box-shadow: 0 0 0 1px rgba(212,160,23,.25) inset,
-                      0 0 20px rgba(212,160,23,.15);
+          background: linear-gradient(135deg, rgba(212,160,23,.18), rgba(212,160,23,.04) 60%, #0C1228);
+          box-shadow: 0 6px 20px rgba(212,160,23,.16), 0 0 0 1px rgba(212,160,23,.10) inset;
         }
+        [data-theme="worldcup"] .rank-card.rank-1 .player-name { color:#FBE9B8; }
+        [data-theme="worldcup"] .rank-card.rank-1 .player-score { color:#F3CF6E; }
+        [data-theme="worldcup"] .rank-card.rank-2 {
+          border-color: rgba(210,220,235,.42);
+          background: linear-gradient(135deg, rgba(214,222,235,.12), rgba(214,222,235,.03) 60%, #0C1228);
+        }
+        [data-theme="worldcup"] .rank-card.rank-2 .player-name { color:#E7ECF5; }
+        [data-theme="worldcup"] .rank-card.rank-2 .player-score { color:#DCE4F0; }
+        [data-theme="worldcup"] .rank-card.rank-3 {
+          border-color: rgba(214,158,110,.42);
+          background: linear-gradient(135deg, rgba(214,158,110,.12), rgba(214,158,110,.03) 60%, #0C1228);
+        }
+        [data-theme="worldcup"] .rank-card.rank-3 .player-name { color:#F0D6BF; }
+        [data-theme="worldcup"] .rank-card.rank-3 .player-score { color:#E9C097; }
 
         /* ---------- 기타 ---------- */
         [data-theme="worldcup"] .badge-gk  { border-color: rgba(200,16,46,.6); color: #FF6680; }
@@ -3017,13 +3039,17 @@ const setGkAward = (pid: string | null) => {
           padding:9px 15px; border:1px solid transparent; border-radius: var(--r-pill);
           background: transparent; color: var(--muted); cursor:pointer;
           font-size: 13.5px; font-weight: 600; white-space: nowrap;
-          transition: color var(--dur) var(--ease), background var(--dur) var(--ease), transform .12s var(--ease);
+          box-shadow: none;
+          transition: color .12s var(--ease), transform .12s var(--ease);
         }
-        .tab:hover { color: var(--text-2); box-shadow: none; }
         .tab:active { transform: scale(.96); }
+        /* hover는 마우스 환경에서만 (터치 잔존 방지) */
+        @media (hover: hover) and (pointer: fine) {
+          .tab:not(.active):hover { color: var(--text-2); background: transparent; }
+        }
         .tab.active {
-          background: linear-gradient(180deg, var(--accent), var(--gold-2));
-          color:#1A1508; border-color: transparent; font-weight: 700;
+          background: linear-gradient(180deg, var(--accent), var(--gold-2)) !important;
+          color:#1A1508 !important; border-color: transparent; font-weight: 700;
           box-shadow: 0 4px 14px rgba(232,197,107,.28), 0 1px 0 rgba(255,255,255,.3) inset;
         }
 
@@ -3075,8 +3101,8 @@ const setGkAward = (pid: string | null) => {
 
         /* 선수관리 */
         .players-admin-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
-        @media (min-width: 1024px) { .players-admin-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-        .player-admin-item { display:grid; grid-template-columns: 52px 1fr 84px 78px; gap:6px; border:1px solid var(--line); border-radius:10px; padding:6px; background:#0B0C10; align-items:center; }
+        @media (min-width: 900px) { .players-admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        .player-admin-item { display:grid; grid-template-columns: 48px minmax(90px, 1fr) 70px 66px; gap:8px; border:1px solid var(--line); border-radius:10px; padding:6px 8px; background:#0B0C10; align-items:center; }
         .player-name-input { min-width: 0; width:100%; padding:6px 8px; font-size:14px; }
         .player-admin-item select { padding:6px 8px; font-size:14px; }
         .player-admin-item button { padding:6px 8px; font-size:13px; }
@@ -3117,7 +3143,15 @@ const setGkAward = (pid: string | null) => {
         button.danger { border-color: rgba(255,107,107,.3); background: var(--danger-soft); }
         button.danger:hover { border-color: var(--danger); background: rgba(255,107,107,.18); }
 
-        .score-input { width: 72px; height: 42px; border:1px solid var(--line); border-radius: var(--r-sm); text-align:center; font-size:17px; font-weight: 700; background: var(--bg-2); color: var(--text); }
+        .score-input {
+          width: 100%; min-width: 0; height: 44px;
+          border:1px solid var(--line); border-radius: var(--r-sm);
+          text-align:center; text-align-last: center;
+          font-size:18px; font-weight: 800; background: var(--bg-2); color: var(--text);
+          /* 좁은 셀렉트라 화살표 제거하고 숫자 중앙 정렬 */
+          background-image: none !important;
+          padding: 0 4px !important;
+        }
 
         .gk-row { display:flex; gap:12px; align-items:center; margin-top:10px; flex-wrap: wrap; }
 
@@ -3163,7 +3197,9 @@ const setGkAward = (pid: string | null) => {
           border-color: var(--line);
           box-shadow: var(--shadow-sm);
         }
-        button:hover { border-color: var(--muted-2); background: #24252c; }
+        @media (hover: hover) and (pointer: fine) {
+          button:hover { border-color: var(--muted-2); background: #24252c; }
+        }
         button:active { transform: scale(.97); }
         button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
         textarea { width:100%; min-height: 80px; line-height: 1.5; }
@@ -3191,32 +3227,92 @@ const setGkAward = (pid: string | null) => {
         .player-stat-nums small { font-size:10px; color:var(--muted); margin-top:2px; }
         .player-stat-total b { color:var(--gold); font-size:24px; }
 
-        /* ===== 랭킹 보드 ===== */
-        .ranking-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        /* ===== 랭킹 보드 (리디자인) ===== */
+        .ranking-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
         @media (min-width: 640px) { .ranking-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (min-width: 880px) { .ranking-grid { grid-template-columns: repeat(3, 1fr); } }
         @media (min-width: 1024px){ .ranking-grid { grid-template-columns: repeat(5, 1fr); } }
 
         .ranking-section { min-width: 0; }
-        .ranking-section h4 { margin: 6px 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .rank-cards { display:flex; flex-direction: column; gap: 6px; }
-        .rank-card { display:flex; align-items:center; background:#1c1c1f; border-radius:10px; padding:6px 8px; color:var(--text); border:1px solid #24262c; gap:4px; }
-        .rank-card .rank-badge { font-weight:800; color:var(--emblem-word); font-size:14px; line-height:1; } /* 순위 숫자: 엠블럼 글자색 */
-        .rank-card .player-name { flex:1 1 auto; margin:0 4px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:14px; }
-        .rank-card .player-score { font-weight:800; color:var(--gold); font-size:14px; line-height:1; }
-        .rank-card.rank-1 { border-color:#FFD700; box-shadow:0 0 0 1px rgba(212,175,55,.2) inset; background:#202127; }
+        .ranking-grid .ranking-section {
+          background: linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,0));
+          border: 1px solid var(--line);
+          border-radius: var(--r-md, 16px);
+          padding: 12px 12px 14px;
+        }
+        .ranking-section h4 {
+          margin: 0 0 12px; padding-bottom: 9px;
+          font-size: 14px; font-weight: 800; letter-spacing: .2px;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          border-bottom: 1px solid var(--line);
+        }
+        .rank-cards { display:flex; flex-direction: column; gap: 7px; }
 
-        @media (max-width: 900px) { .scoreline { grid-template-columns: 1fr 62px 18px 62px 1fr; } .score-input { width: 62px; } }
+        .rank-card {
+          position: relative; display:grid;
+          grid-template-columns: 24px minmax(0,1fr) auto; align-items:center;
+          background: var(--bg-2, #16171c); border-radius: 12px;
+          padding: 9px 10px; color: var(--text);
+          border: 1px solid var(--line); gap: 6px;
+          transition: transform .14s var(--ease), border-color .14s var(--ease), box-shadow .14s var(--ease);
+        }
+        @media (hover: hover) and (pointer: fine) {
+          .rank-card:hover { transform: translateY(-1px); border-color: var(--muted-2); }
+        }
+        .rank-card .rank-badge {
+          display:flex; align-items:center; justify-content:center;
+          width:22px; height:22px; border-radius:999px;
+          font-weight:800; font-size:12px; line-height:1;
+          color: var(--muted); background: rgba(255,255,255,.05);
+        }
+        .rank-card .player-name {
+          min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+          font-size:14px; font-weight:600;
+        }
+        .rank-card .player-score {
+          font-weight:900; color:var(--text); font-size:16px; line-height:1;
+          font-variant-numeric: tabular-nums; letter-spacing:-.3px;
+        }
+        .rank-empty { text-align:center; color:var(--muted); font-size:12.5px; padding:14px 0; }
+
+        /* --- 포디움 (Top 3) --- */
+        .rank-card.rank-1, .rank-card.rank-2, .rank-card.rank-3 { border-width:1px; }
+        .rank-card.rank-1 .rank-badge,
+        .rank-card.rank-2 .rank-badge,
+        .rank-card.rank-3 .rank-badge { background: transparent; font-size:17px; width:22px; }
+
+        .rank-card.rank-1 {
+          background: linear-gradient(135deg, rgba(255,214,102,.20), rgba(232,197,107,.05) 60%, var(--bg-2));
+          border-color: rgba(255,214,102,.55);
+          box-shadow: 0 6px 20px rgba(232,197,107,.16), 0 0 0 1px rgba(255,214,102,.10) inset;
+        }
+        .rank-card.rank-1 .player-name { font-weight:800; color:#FDECBE; }
+        .rank-card.rank-1 .player-score { color:#FFD97A; font-size:18px; }
+
+        .rank-card.rank-2 {
+          background: linear-gradient(135deg, rgba(214,222,235,.14), rgba(214,222,235,.03) 60%, var(--bg-2));
+          border-color: rgba(210,220,235,.42);
+        }
+        .rank-card.rank-2 .player-name { font-weight:700; color:#E7ECF5; }
+        .rank-card.rank-2 .player-score { color:#DCE4F0; }
+
+        .rank-card.rank-3 {
+          background: linear-gradient(135deg, rgba(214,158,110,.14), rgba(214,158,110,.03) 60%, var(--bg-2));
+          border-color: rgba(214,158,110,.42);
+        }
+        .rank-card.rank-3 .player-name { font-weight:700; color:#F0D6BF; }
+        .rank-card.rank-3 .player-score { color:#E9C097; }
+
+        @media (max-width: 900px) { .scoreline { grid-template-columns: minmax(0,1fr) 64px 18px 64px minmax(0,1fr); } }
         @media (max-width: 480px) {
           .match-head { grid-template-columns: 1fr; grid-template-areas: "seq" "score" "actions"; row-gap: 8px; align-items: stretch; }
           .seq { font-size: 16px; }
-          .scoreline { grid-template-columns: minmax(0,1fr) 54px 14px 54px minmax(0,1fr); }
+          .scoreline { grid-template-columns: minmax(0,1fr) 60px 14px 60px minmax(0,1fr); }
           .head-actions { justify-content: flex-start; flex-wrap: wrap; }
           .head-actions button { padding: 6px 10px; }
           .gk-row { gap: 8px; }
-          .score-input { width: 54px; }
         }
-        @media (max-width: 360px) { .scoreline { grid-template-columns: minmax(0,1fr) 48px 12px 48px minmax(0,1fr); } .stat-input { width: 56px; } .score-input { width: 48px; } }
+        @media (max-width: 360px) { .scoreline { grid-template-columns: minmax(0,1fr) 52px 12px 52px minmax(0,1fr); } .stat-input { width: 56px; } }
         @media (max-width: 720px) {
           .teams-grid { grid-template-columns: 1fr; }
           .record-grid { grid-template-columns: 1fr; }
@@ -3235,10 +3331,6 @@ const setGkAward = (pid: string | null) => {
           .panel { padding: 12px; }
           .panel-actions { width: 100%; }
           .panel-actions button { flex: 1 1 auto; }
-        }
-        /* tap highlight + smoother momentum */
-        @media (hover: none) {
-          button:hover, .tab:hover { background: inherit; }
         }
         * { -webkit-tap-highlight-color: transparent; }
       
