@@ -581,8 +581,8 @@ function FormationPreview({
     color === "red"    ? "#E74C3C" :
     color === "yellow" ? "#F1C40F" :
     color === "green"  ? "#4CAF50" : "#EAEAEA";
-  const labelColor = (color === "yellow" || color === "white") ? "#1a1a1a" : "#ffffff";
-  const labelStroke = (color === "yellow" || color === "white") ? "#ffffff" : "black";
+  const labelColor = (color === "white") ? "#1a1a1a" : "#ffffff";
+  const labelStroke = (color === "white") ? "#ffffff" : "black";
 
   const jerseyFill =
     color === "red"    ? "var(--jersey-red)"    :
