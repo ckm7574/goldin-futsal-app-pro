@@ -1226,22 +1226,39 @@ const patchSession = (patch: Partial<Session>) => {
   };
 
   const addMatch = () => {
-    let maxSeq = 0; asArray<Match>(cur.matches, []).forEach(m => { if (m.seq && m.seq > maxSeq) maxSeq = m.seq; });
+    const matches = asArray<Match>(cur.matches, []);
+    let maxSeq = 0; matches.forEach(m => { if (m.seq && m.seq > maxSeq) maxSeq = m.seq; });
     const nextSeq = maxSeq + 1;
+
+    // 실제 선수 명단이 등록된 팀 목록(등록된 팀만 자동 편성 대상)
+    const activeTeams = getActiveTeamsSafe(cur);
+    const registeredTeams = activeTeams.filter(
+      tid => asArray<string>((cur.rosters as Record<TeamId, string[]>)?.[tid], []).length > 0
+    );
 
     let home: TeamId = "A";
     let away: TeamId = "B";
 
-    if (nextSeq >= 4 && nextSeq <= 9) {
+    if (registeredTeams.length === 2) {
+      // ── 2팀 등록: 1경기 진영을 기준으로 2경기부터 번갈아 자동 편성 ──
+      const firstMatch = matches.find(m => m.seq === 1) || matches[0];
+      const baseHome = firstMatch ? firstMatch.home : registeredTeams[0];
+      const baseAway = firstMatch ? firstMatch.away : registeredTeams[1];
+      // 2경기부터 홈/원정을 번갈아(swap) 채움 (2경기=반전, 3경기=원래, ...)
+      const swap = (nextSeq % 2 === 0);
+      home = swap ? baseAway : baseHome;
+      away = swap ? baseHome : baseAway;
+    } else if (nextSeq >= 4 && nextSeq <= 9) {
+      // ── 3팀 등록: 1~3경기 진영을 3경기 주기로 반복 자동 편성 ──
       const baseSeq: number = ((nextSeq - 1) % 3) + 1;
-      const baseMatch = asArray<Match>(cur.matches, []).find(m => m.seq === baseSeq);
+      const baseMatch = matches.find(m => m.seq === baseSeq);
       if (baseMatch) {
         home = baseMatch.home;
         away = baseMatch.away;
       }
     }
 
-    patchSession({ matches: [...asArray<Match>(cur.matches, []), { id: uid(), seq: nextSeq, home, away, hg: 0, ag: 0, gkHome: null, gkAway: null }] });
+    patchSession({ matches: [...matches, { id: uid(), seq: nextSeq, home, away, hg: 0, ag: 0, gkHome: null, gkAway: null }] });
   };
 
   const deleteMatch = (id: string) => patchSession({ matches: asArray<Match>(cur.matches, []).filter(m => m.id !== id) });
