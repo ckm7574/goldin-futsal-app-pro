@@ -1770,53 +1770,72 @@ const setGkAward = (pid: string | null) => {
         );
       })()}
 
-      {theme !== "worldcup" && <h1 className="title">골딘 풋살 리그 · 기록/집계</h1>}
+      {theme !== "worldcup" && (
+        <header className="app-header">
+          <div className="app-brand">
+            <span className="app-logo">⚽</span>
+            <div className="app-brand-text">
+              <span className="app-title">골딘 풋살 리그</span>
+              <span className="app-sub">기록 · 집계</span>
+            </div>
+          </div>
+          {/* 테마 토글 */}
+          <div className="theme-toggle">
+            <button
+              className={theme === "goldin" ? "seg on" : "seg"}
+              onClick={() => { setTheme("goldin"); localStorage.setItem("app-theme", "goldin"); }}
+            >골딘</button>
+            <button
+              className={(theme as string) === "worldcup" ? "seg on wc" : "seg"}
+              onClick={() => { setTheme("worldcup"); localStorage.setItem("app-theme", "worldcup"); }}
+            >🌍 월드컵</button>
+          </div>
+        </header>
+      )}
 
-      <div className="panel">
-        {viewerFlag && <span className="badge-view">보기 전용 링크</span>}
-        {authed ? <>
-          <span className="ok">관리자 모드</span>
-          <button onClick={lock}>잠금</button>
-          <button onClick={copyViewerLink}>보기 전용 링크 복사</button>
-          <button onClick={exportData}>데이터 내보내기</button>
-        </> : <>
-          <span className="label-strong">관리자 PIN:</span>
-          <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="PIN 입력" />
-          <button onClick={unlock}>잠금 해제</button>
-          <button onClick={copyViewerLink}>보기 전용 링크 복사</button>
-        </>}
-        {/* 테마 토글 */}
-        <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+      {theme === "worldcup" && (
+        <div className="theme-toggle theme-toggle-wc">
           <button
+            className={(theme as string) === "goldin" ? "seg on" : "seg"}
             onClick={() => { setTheme("goldin"); localStorage.setItem("app-theme", "goldin"); }}
-            style={{ fontSize: 12, padding: "5px 10px",
-              background: theme === "goldin" ? "var(--gold)" : undefined,
-              color: theme === "goldin" ? "#1a1a1a" : undefined,
-              borderColor: theme === "goldin" ? "var(--gold)" : undefined,
-              fontWeight: theme === "goldin" ? 700 : undefined }}
           >골딘</button>
           <button
+            className={theme === "worldcup" ? "seg on wc" : "seg"}
             onClick={() => { setTheme("worldcup"); localStorage.setItem("app-theme", "worldcup"); }}
-            style={{ fontSize: 12, padding: "5px 10px",
-              background: theme === "worldcup" ? "#C8102E" : undefined,
-              color: theme === "worldcup" ? "#fff" : undefined,
-              borderColor: theme === "worldcup" ? "#C8102E" : undefined,
-              fontWeight: theme === "worldcup" ? 700 : undefined }}
           >🌍 월드컵</button>
         </div>
+      )}
+
+      <div className="panel">
+        {viewerFlag && <span className="badge-view">보기 전용</span>}
+        {authed ? <>
+          <span className="ok">관리자 모드</span>
+          <div className="panel-actions">
+            <button onClick={lock}>잠금</button>
+            <button onClick={copyViewerLink}>링크 복사</button>
+            <button onClick={exportData}>내보내기</button>
+          </div>
+        </> : <>
+          <span className="label-strong">관리자 PIN</span>
+          <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="PIN 입력" style={{ flex: "1 1 120px", minWidth: 0 }} />
+          <div className="panel-actions">
+            <button onClick={unlock}>잠금 해제</button>
+            <button onClick={copyViewerLink}>링크 복사</button>
+          </div>
+        </>}
       </div>
 
-      <div className="tabs">
+      <nav className="tabs">
         <button className={page === 1 ? "tab active" : "tab"} onClick={() => setPage(1)}>선수 관리</button>
         <button className={page === 2 ? "tab active" : "tab"} onClick={() => setPage(2)}>일자별 경기 기록</button>
         <button className={page === 3 ? "tab active" : "tab"} onClick={() => setPage(3)}>전체 순위</button>
         <button className={page === 4 ? "tab active" : "tab"} onClick={() => setPage(4)}>선수 분석</button>
         <button className={page === 5 ? "tab active" : "tab"} onClick={() => setPage(5)}>랭킹 보드</button>
-      </div>
+      </nav>
 
       {page === 2 && (
-        <div className="row">
-          <label className="label-strong">날짜:</label>
+        <div className="date-bar">
+          <label className="label-strong">📅 날짜</label>
           <input type="date" value={ensureSunday(sessionDate)} onChange={e => setSessionDate(ensureSunday(e.target.value))} />
           <span className="hint">일요일로 자동 보정</span>
         </div>
@@ -2480,8 +2499,45 @@ const setGkAward = (pid: string | null) => {
 
       <style>{`
         :root{
-          --gold:#D4AF37; --gold-2:#C89B3C; --emblem-word:#EAEAEA;
-          --bg:#0B0C0F; --card:#15161A; --line:#23252B; --text:#EAEAEA; --muted:#A9A9A9;
+          --gold:#E8C56B; --gold-2:#C89B3C; --emblem-word:#F4F5F7;
+          /* refined dark palette — layered neutrals with a hint of warmth */
+          --bg:#0A0B0E;
+          --bg-2:#0E0F13;
+          --card:#141519;
+          --card-2:#191A1F;
+          --elev:#1E1F25;
+          --line:#26272E;
+          --line-soft:#1D1E24;
+          --text:#F1F2F4;
+          --text-2:#C9CBD1;
+          --muted:#8A8D96;
+          --muted-2:#666973;
+          --accent:#E8C56B;
+          --accent-soft:rgba(232,197,107,.12);
+          --danger:#FF6B6B;
+          --danger-soft:rgba(255,107,107,.12);
+          --ok:#4ADE80;
+
+          /* elevation / depth */
+          --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+          --shadow-md:0 4px 16px rgba(0,0,0,.35);
+          --shadow-lg:0 12px 40px rgba(0,0,0,.5);
+          --ring:0 0 0 1px rgba(255,255,255,.04) inset;
+
+          /* radii */
+          --r-sm:10px;
+          --r-md:14px;
+          --r-lg:20px;
+          --r-xl:26px;
+          --r-pill:999px;
+
+          /* motion */
+          --ease:cubic-bezier(.22,.61,.36,1);
+          --dur:.22s;
+
+          /* safe areas */
+          --sat:env(safe-area-inset-top, 0px);
+          --sab:env(safe-area-inset-bottom, 0px);
 
           /* 조끼 색상 */
           --jersey-red:#E74C3C;
@@ -2697,9 +2753,16 @@ const setGkAward = (pid: string | null) => {
 
         /* ---------- 패널 ---------- */
         [data-theme="worldcup"] .panel {
-          background: linear-gradient(180deg, #0C1328 0%, #07091A 100%);
+          background: linear-gradient(180deg, rgba(12,19,40,.72), rgba(7,9,26,.72));
           border-color: #1A2640;
         }
+        [data-theme="worldcup"] .app-logo { background: linear-gradient(150deg,#12224a,#070d1e); border-color:#1A2640; }
+        [data-theme="worldcup"] .theme-toggle,
+        [data-theme="worldcup"] .tabs { background: rgba(9,13,27,.85); border-color:#1A2640; }
+        [data-theme="worldcup"] .date-bar,
+        [data-theme="worldcup"] .team-card,
+        [data-theme="worldcup"] .card,
+        [data-theme="worldcup"] .box { background: linear-gradient(180deg,#0C1328,#07091A); }
 
         /* ---------- 탭 ---------- */
         [data-theme="worldcup"] .tab {
@@ -2822,35 +2885,192 @@ const setGkAward = (pid: string | null) => {
         }
 
         *, *::before, *::after { box-sizing: border-box; }
-        body { background: var(--bg); }
+        html { -webkit-text-size-adjust: 100%; }
+        body {
+          background: var(--bg);
+          margin: 0;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          text-rendering: optimizeLegibility;
+          overscroll-behavior-y: none;
+        }
+        /* ambient background glow — subtle, premium */
+        body::before {
+          content:"";
+          position: fixed; inset: 0; z-index: 0; pointer-events: none;
+          background:
+            radial-gradient(60% 45% at 50% -5%, rgba(232,197,107,.06), transparent 70%),
+            radial-gradient(50% 40% at 100% 100%, rgba(80,90,120,.05), transparent 70%);
+        }
+        ::selection { background: var(--accent-soft); color: var(--text); }
 
-        .wrap { max-width: 1100px; margin: 0 auto; padding: 14px; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif; color: var(--text); background: var(--bg); }
-        .title { font-size: 22px; font-weight: 800; margin: 4px 0 10px; letter-spacing: .2px; }
+        /* refined scrollbars */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #2b2d35; border-radius: 999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #363943; }
 
-        .panel { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:10px; border:1px solid var(--line); border-radius:12px; background: linear-gradient(180deg, #121318, #0E0F13); }
-        .badge-view { font-size:12px; color:#ff7a7a; font-weight:700; }
-        .label-strong { font-weight:700; color: var(--text); }
-        .ok { color: var(--gold); font-weight:700; }
+        .wrap {
+          position: relative; z-index: 1;
+          max-width: 900px; margin: 0 auto;
+          padding: calc(12px + var(--sat)) 16px calc(96px + var(--sab));
+          font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+          color: var(--text); background: transparent;
+          letter-spacing: -.01em;
+        }
+        .title { font-size: 22px; font-weight: 800; margin: 4px 0 10px; letter-spacing: -.02em; }
+
+        /* ===== App header — branded top bar ===== */
+        .app-header {
+          display:flex; align-items:center; justify-content:space-between; gap:12px;
+          padding: 6px 2px 14px;
+        }
+        .app-brand { display:flex; align-items:center; gap:11px; min-width:0; }
+        .app-logo {
+          width:42px; height:42px; flex:0 0 auto;
+          display:flex; align-items:center; justify-content:center;
+          font-size:22px; border-radius:13px;
+          background: linear-gradient(150deg, #23252c, #141519);
+          border:1px solid var(--line);
+          box-shadow: 0 4px 14px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.05) inset;
+        }
+        .app-brand-text { display:flex; flex-direction:column; line-height:1.15; min-width:0; }
+        .app-title {
+          font-size:19px; font-weight:800; letter-spacing:-.02em; color: var(--text);
+          background: linear-gradient(180deg, #FFFFFF 30%, #D9D6CB 100%);
+          -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .app-sub { font-size:11.5px; font-weight:600; letter-spacing:.14em; color: var(--muted); text-transform: uppercase; }
+
+        /* segmented theme toggle */
+        .theme-toggle {
+          display:inline-flex; gap:3px; padding:3px; flex:0 0 auto;
+          border-radius: var(--r-pill); border:1px solid var(--line-soft);
+          background: var(--bg-2); box-shadow: var(--ring);
+        }
+        .theme-toggle-wc { margin: 0 0 12px auto; }
+        .theme-toggle .seg {
+          padding:6px 11px; font-size:12px; font-weight:600; border:none; border-radius: var(--r-pill);
+          background: transparent; color: var(--muted); box-shadow:none; white-space:nowrap;
+        }
+        .theme-toggle .seg:hover { background: transparent; color: var(--text-2); }
+        .theme-toggle .seg.on {
+          background: linear-gradient(180deg, var(--accent), var(--gold-2)); color:#1A1508; font-weight:700;
+          box-shadow: 0 2px 8px rgba(232,197,107,.3);
+        }
+        .theme-toggle .seg.on.wc {
+          background: linear-gradient(180deg, #E23B54, #C8102E); color:#fff;
+          box-shadow: 0 2px 8px rgba(200,16,46,.4);
+        }
+
+        .panel-actions { display:flex; gap:6px; margin-left:auto; flex-wrap:wrap; }
+        .panel-actions button { font-size:13px; padding:8px 12px; }
+
+        /* footer */
+        .footer { text-align:center; color: var(--muted-2); font-size:12px; margin: 28px 0 8px; letter-spacing:.02em; }
+
+        /* date picker row polish */
+        .date-bar {
+          display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+          margin:14px 0 0; padding:12px 14px;
+          border:1px solid var(--line-soft); border-radius: var(--r-md);
+          background: linear-gradient(180deg, var(--card-2), var(--card));
+          box-shadow: var(--ring);
+        }
+        .date-bar input[type="date"] { flex: 1 1 160px; min-width: 0; }
+
+        /* ===== App bar (panel) — sleek sticky top bar ===== */
+        .panel {
+          display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+          padding:10px 12px;
+          border:1px solid var(--line-soft); border-radius: var(--r-lg);
+          background: linear-gradient(180deg, rgba(30,31,37,.72), rgba(20,21,25,.72));
+          backdrop-filter: blur(18px) saturate(140%);
+          -webkit-backdrop-filter: blur(18px) saturate(140%);
+          box-shadow: var(--shadow-md), var(--ring);
+        }
+        .badge-view { font-size:11px; color: var(--danger); font-weight:700; padding:3px 9px; border-radius: var(--r-pill); background: var(--danger-soft); }
+        .label-strong { font-weight:700; color: var(--text); font-size: 13px; }
+        .ok { color: var(--accent); font-weight:700; font-size: 13px; display:inline-flex; align-items:center; gap:5px; }
+        .ok::before { content:""; width:7px; height:7px; border-radius:50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
         .hint { color: var(--muted); font-size:12px; }
         .muted { color: var(--muted); }
 
-        .tabs { display:flex; gap:8px; margin:12px 0; flex-wrap: wrap; }
-        .tab { padding:8px 12px; border:1px solid var(--line); border-radius:999px; background:#15161A; color:var(--text); cursor:pointer; transition:all .15s; }
-        .tab:hover { border-color: var(--gold-2); }
-        .tab.active { background: var(--gold); color:#1A1A1A; border-color: var(--gold); }
+        /* ===== Tabs — polished scrollable segmented nav (sticky) ===== */
+        .tabs {
+          display:flex; gap:6px; margin:14px 0; flex-wrap: nowrap;
+          overflow-x: auto; overflow-y: hidden;
+          padding: 5px; border-radius: var(--r-pill);
+          background: linear-gradient(180deg, rgba(20,21,25,.9), rgba(11,12,16,.9));
+          backdrop-filter: blur(16px) saturate(140%);
+          -webkit-backdrop-filter: blur(16px) saturate(140%);
+          border: 1px solid var(--line-soft);
+          box-shadow: var(--ring), var(--shadow-md);
+          scrollbar-width: none; -ms-overflow-style: none;
+          scroll-snap-type: x proximity;
+          -webkit-overflow-scrolling: touch;
+          position: sticky; top: calc(8px + var(--sat)); z-index: 20;
+        }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab {
+          flex: 0 0 auto; scroll-snap-align: center;
+          padding:9px 15px; border:1px solid transparent; border-radius: var(--r-pill);
+          background: transparent; color: var(--muted); cursor:pointer;
+          font-size: 13.5px; font-weight: 600; white-space: nowrap;
+          transition: color var(--dur) var(--ease), background var(--dur) var(--ease), transform .12s var(--ease);
+        }
+        .tab:hover { color: var(--text-2); box-shadow: none; }
+        .tab:active { transform: scale(.96); }
+        .tab.active {
+          background: linear-gradient(180deg, var(--accent), var(--gold-2));
+          color:#1A1508; border-color: transparent; font-weight: 700;
+          box-shadow: 0 4px 14px rgba(232,197,107,.28), 0 1px 0 rgba(255,255,255,.3) inset;
+        }
 
-        .row { display:flex; gap:8px; align-items:center; margin:6px 0; }
+        .row { display:flex; gap:8px; align-items:center; margin:8px 0; flex-wrap: wrap; }
         .row.spread { justify-content: space-between; }
-        .box { border:1px solid var(--line); border-radius:12px; padding:12px; margin-top:12px; background: var(--card); box-shadow: 0 1px 8px rgba(0,0,0,.35); }
+        .box {
+          border:1px solid var(--line-soft); border-radius: var(--r-lg);
+          padding:16px; margin-top:14px;
+          background: linear-gradient(180deg, var(--card-2), var(--card));
+          box-shadow: var(--shadow-md), var(--ring);
+        }
+        .box h3 {
+          margin: 0 0 12px; font-size: 16px; font-weight: 700; letter-spacing: -.02em;
+          display:flex; align-items:center; gap:8px;
+        }
+        .box h3::before {
+          content:""; width:3px; height:15px; border-radius: 3px;
+          background: linear-gradient(180deg, var(--accent), var(--gold-2));
+        }
+        .box h4 { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
         .hidden { display:none; }
 
-        .teams-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; }
-        .team-card { border:1px solid var(--line); border-radius:12px; padding:8px; background:#111318; }
-        .team-id { margin-left:auto; font-size:12px; color: var(--muted); }
-        .checkline { display:flex; gap:6px; align-items:center; padding:4px 0; }
-        .badge-gk { margin-left:6px; font-size:11px; padding:2px 6px; border:1px solid var(--gold-2); border-radius:999px; color:var(--gold); }
+        .teams-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; }
+        .team-card {
+          border:1px solid var(--line-soft); border-radius: var(--r-md); padding:12px;
+          background: linear-gradient(180deg, var(--card-2), var(--card));
+          box-shadow: var(--shadow-sm), var(--ring);
+        }
+        .team-id {
+          margin-left:auto; font-size:11px; font-weight:700; color: var(--muted);
+          background: rgba(255,255,255,.04); border:1px solid var(--line-soft);
+          padding: 2px 8px; border-radius: var(--r-pill);
+        }
+        .checkline {
+          display:flex; gap:8px; align-items:center; padding:8px 8px;
+          border-radius: var(--r-sm); transition: background .15s var(--ease);
+          font-size: 14px;
+        }
+        .checkline:hover { background: rgba(255,255,255,.03); }
+        .checkline input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); flex: 0 0 auto; }
+        .badge-gk { margin-left:6px; font-size:10px; font-weight:700; padding:2px 8px; border:1px solid rgba(232,197,107,.4); border-radius: var(--r-pill); color:var(--accent); background: var(--accent-soft); }
 
-        .list-scroll { max-height: 280px; overflow:auto; border:1px solid var(--line); border-radius:8px; padding:6px; background:#0E1015; }
+        .list-scroll {
+          max-height: 280px; overflow:auto;
+          border:1px solid var(--line-soft); border-radius: var(--r-md); padding:6px;
+          background: var(--bg-2);
+        }
         .list-scroll.small { max-height: 200px; }
 
         /* 선수관리 */
@@ -2870,45 +3090,78 @@ const setGkAward = (pid: string | null) => {
         .player-photo-del { padding:1px 5px; font-size:10px; background:#2a0a0a; border-color:#5a2020; color:#ff8a8a; border-radius:999px; cursor:pointer; }
         .player-photo-del:hover { background:#3a1010; }
 
-        .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border:1px solid var(--line); border-radius:10px; padding:6px; background:#0F1116; }
-        .tbl { width: 100%; border-collapse: separate; border-spacing: 0; color: var(--text); }
-        .tbl th, .tbl td { border-bottom:1px solid #1f2127; padding:8px 10px; text-align:center; }
-        .tbl th { background:#141721; position: sticky; top: 0; z-index: 1; color:#dcdcdc; }
-        .bold { font-weight:700; color: var(--gold); }
-        .subtle { color:#b0b0b0; font-size:12px; }
+        .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border:1px solid var(--line-soft); border-radius: var(--r-md); padding:4px; background: var(--card); box-shadow: var(--ring); }
+        .tbl { width: 100%; border-collapse: separate; border-spacing: 0; color: var(--text); font-size: 14px; }
+        .tbl th, .tbl td { border-bottom:1px solid var(--line-soft); padding:11px 12px; text-align:center; }
+        .tbl th { background: var(--bg-2); position: sticky; top: 0; z-index: 1; color: var(--muted); font-weight:700; font-size: 12px; letter-spacing: .02em; text-transform: uppercase; }
+        .tbl th:first-child { border-top-left-radius: var(--r-sm); }
+        .tbl th:last-child { border-top-right-radius: var(--r-sm); }
+        .tbl tr:last-child td { border-bottom: none; }
+        .tbl tbody tr { transition: background .15s var(--ease); }
+        .tbl tbody tr:hover td { background: rgba(255,255,255,.025); }
+        .bold { font-weight:700; color: var(--accent); }
+        .subtle { color: var(--muted); font-size:12px; }
 
-        .card { border:1px solid var(--line); border-radius:12px; padding:10px; background:#111318; overflow: hidden; }
+        .card {
+          border:1px solid var(--line-soft); border-radius: var(--r-md); padding:14px;
+          background: linear-gradient(180deg, var(--card-2), var(--card));
+          overflow: hidden; box-shadow: var(--shadow-sm), var(--ring);
+        }
 
         .match-head { display: grid; grid-template-columns: 72px 1fr auto; grid-template-areas: "seq score actions"; gap: 10px; align-items: center; }
-        .seq { grid-area: seq; font-weight: 800; color: var(--gold); }
+        .seq { grid-area: seq; font-weight: 800; color: var(--accent); font-size: 15px; }
         .scoreline { grid-area: score; display: grid; grid-template-columns: 1fr 72px 22px 72px 1fr; gap: 6px; align-items: center; }
-        .colon { text-align:center; font-weight:700; color: var(--muted); }
+        .colon { text-align:center; font-weight:800; color: var(--muted); font-size: 18px; }
         .head-actions { grid-area: actions; display:flex; gap:6px; justify-content:flex-end; flex-wrap: nowrap; }
-        .danger { color:#ff8a8a; }
+        .danger { color: var(--danger); }
+        button.danger { border-color: rgba(255,107,107,.3); background: var(--danger-soft); }
+        button.danger:hover { border-color: var(--danger); background: rgba(255,107,107,.18); }
 
-        .score-input { width: 72px; height: 38px; border:1px solid var(--line); border-radius:8px; text-align:center; font-size:15px; background:#0D0F14; color: var(--text); }
+        .score-input { width: 72px; height: 42px; border:1px solid var(--line); border-radius: var(--r-sm); text-align:center; font-size:17px; font-weight: 700; background: var(--bg-2); color: var(--text); }
 
-        .gk-row { display:flex; gap:12px; align-items:center; margin-top:6px; flex-wrap: wrap; }
+        .gk-row { display:flex; gap:12px; align-items:center; margin-top:10px; flex-wrap: wrap; }
 
-        .record-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:10px; }
-        .team-col { border:1px solid var(--line); border-radius:10px; padding:8px; background:#0E1015; }
-        .team-col-head { font-weight:700; margin-bottom:6px; color: var(--gold); }
+        .record-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px; }
+        .team-col { border:1px solid var(--line-soft); border-radius: var(--r-md); padding:10px; background: var(--bg-2); }
+        .team-col-head { font-weight:700; margin-bottom:8px; color: var(--accent); font-size: 13px; }
 
         .players-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
-        .player-card { border:1px solid var(--line); border-radius:10px; padding:8px; background:#0B0C10; display:flex; align-items:center; gap:8px; flex-wrap: wrap; }
+        .player-card { border:1px solid var(--line-soft); border-radius: var(--r-sm); padding:10px; background: var(--card); display:flex; align-items:center; gap:8px; flex-wrap: wrap; }
         .player-name { flex:1 1 180px; min-width: 140px; font-weight:600; color: var(--text); }
-        .pos { color:#9aa0aa; font-size:12px; }
+        .pos { color: var(--muted); font-size:12px; }
 
         .stat { display:inline-flex; align-items:center; gap:6px; }
-        .stat-label { font-weight:600; color:#cfcfcf; }
-        .stat-input { width:64px; height:38px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; text-align:center; font-size:15px; background:#0D0F14; color: var(--text); }
-        .stat-input.select { width:64px; height:38px; }
+        .stat-label { font-weight:700; color: var(--text-2); font-size: 13px; }
+        .stat-input { width:64px; height:42px; padding:6px 8px; border:1px solid var(--line); border-radius: var(--r-sm); text-align:center; font-size:15px; font-weight: 600; background: var(--bg-2); color: var(--text); }
+        .stat-input.select { width:64px; height:42px; }
 
-        input, select, textarea, button { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background:#0D0F14; color: var(--text); font-size:16px; }
-        input::placeholder, textarea::placeholder { color:#7f8694; }
-        button { background:#12151C; cursor:pointer; transition: all .15s; }
-        button:hover { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(212,175,55,0.08) inset; }
-        textarea { width:100%; min-height: 80px; }
+        input, select, textarea, button {
+          padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-sm);
+          background: var(--bg-2); color: var(--text); font-size:16px;
+          font-family: inherit; letter-spacing: -.01em;
+          transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background var(--dur) var(--ease), transform .1s var(--ease);
+          -webkit-appearance: none; appearance: none;
+        }
+        input::placeholder, textarea::placeholder { color: var(--muted-2); }
+        input:focus, select:focus, textarea:focus {
+          outline: none; border-color: var(--accent);
+          box-shadow: 0 0 0 3px var(--accent-soft);
+          background: var(--card);
+        }
+        select {
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%238A8D96' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+          background-repeat: no-repeat; background-position: right 12px center;
+          padding-right: 32px;
+        }
+        button {
+          background: var(--elev); cursor:pointer; font-weight: 600; font-size: 14px;
+          border-color: var(--line);
+          box-shadow: var(--shadow-sm);
+        }
+        button:hover { border-color: var(--muted-2); background: #24252c; }
+        button:active { transform: scale(.97); }
+        button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+        textarea { width:100%; min-height: 80px; line-height: 1.5; }
 
         .analysis h4 { margin: 0 0 8px; }
 
@@ -2962,13 +3215,27 @@ const setGkAward = (pid: string | null) => {
         @media (max-width: 720px) {
           .teams-grid { grid-template-columns: 1fr; }
           .record-grid { grid-template-columns: 1fr; }
-          .table-wrap { border: none; padding: 0; background: transparent; }
-          .tbl th, .tbl td { border-bottom: 1px solid #23262c; }
+          .table-wrap { padding: 4px; }
           .tbl tr:last-child td { border-bottom: none; }
-          .card { box-shadow: 0 1px 4px rgba(0,0,0,0.4); border: 1px solid var(--line); }
-          .box { border: 1px solid var(--line); }
           .player-name { flex-basis: 100%; }
         }
+        @media (max-width: 480px) {
+          .wrap { padding-left: 12px; padding-right: 12px; }
+          .app-title { font-size: 17px; }
+          .app-logo { width: 38px; height: 38px; font-size: 20px; border-radius: 12px; }
+          .theme-toggle .seg { padding: 6px 9px; font-size: 11.5px; }
+          .box { padding: 14px; }
+          .box h3 { font-size: 15px; }
+          .tab { padding: 8px 13px; font-size: 13px; }
+          .panel { padding: 12px; }
+          .panel-actions { width: 100%; }
+          .panel-actions button { flex: 1 1 auto; }
+        }
+        /* tap highlight + smoother momentum */
+        @media (hover: none) {
+          button:hover, .tab:hover { background: inherit; }
+        }
+        * { -webkit-tap-highlight-color: transparent; }
       
         /* === Readability improvements for jersey texts === */
         .player-initials {
