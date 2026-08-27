@@ -966,6 +966,15 @@ useEffect(() => { (async () => {
   } catch {}
 })(); }, []);
 const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
+  // 팀 구성 영역 접기/펼치기 (경기 기록 편의용, 화면 표시 전용 · localStorage 저장)
+  const [teamComposeHidden, setTeamComposeHidden] = useState<boolean>(() => {
+    try { return localStorage.getItem("team-compose-hidden") === "1"; } catch { return false; }
+  });
+  const toggleTeamCompose = () => setTeamComposeHidden(prev => {
+    const next = !prev;
+    try { localStorage.setItem("team-compose-hidden", next ? "1" : "0"); } catch {}
+    return next;
+  });
   const [theme, setTheme] = useState<"goldin" | "worldcup">(() =>
     (localStorage.getItem("app-theme") as "goldin" | "worldcup") || "goldin"
   );
@@ -1942,7 +1951,15 @@ const setGkAward = (pid: string | null) => {
           <section className="box">
             <div className="team-compose-head">
               <h3>팀 구성</h3>
-            {!cur?.hasTeamD && (
+              <button
+                className="btn toggle-compose"
+                onClick={toggleTeamCompose}
+                aria-expanded={!teamComposeHidden}
+                title={teamComposeHidden ? "팀 구성 펼치기" : "팀 구성 숨기기"}
+              >
+                {teamComposeHidden ? "▸ 팀 구성 보기" : "▾ 팀 구성 숨기기"}
+              </button>
+            {!cur?.hasTeamD && !teamComposeHidden && (
               <button className="btn add-team" onClick={() => {
                 if (readonly) return;
                 const key = ensureSunday(sessionDate);
@@ -1957,7 +1974,7 @@ const setGkAward = (pid: string | null) => {
                 });
               }}>+ 팀 추가</button>
             )}
-            {cur?.hasTeamD && !readonly && (() => {
+            {cur?.hasTeamD && !readonly && !teamComposeHidden && (() => {
               const dMatchCount = asArray<Match>(cur.matches, []).filter(
                 m => m.home === "D" || m.away === "D"
               ).length;
@@ -2000,6 +2017,12 @@ const setGkAward = (pid: string | null) => {
               );
             })()}
             </div>
+            {teamComposeHidden ? (
+              <div className="compose-collapsed-hint" onClick={toggleTeamCompose}>
+                팀 구성이 숨겨져 있습니다. <b>팀 구성 보기</b>를 눌러 다시 편집할 수 있어요.
+              </div>
+            ) : (
+            <>
             <div className="teams-grid">
               {getActiveTeamsSafe(typeof cur !== "undefined" ? cur : undefined).map(tid => {
                 const isConfirmed = Boolean(cur.rosterViewConfirmed?.[tid]);
@@ -2152,6 +2175,8 @@ const setGkAward = (pid: string | null) => {
                 </select>
                 <span className="hint">+1점</span>
               </div>
+            )}
+            </>
             )}
           </section>
 
@@ -3098,6 +3123,22 @@ const setGkAward = (pid: string | null) => {
         }
         .team-compose-head h3 { margin: 0; }
         .team-compose-head .add-team { padding: 5px 12px; font-size: 13px; }
+        .team-compose-head .toggle-compose {
+          padding: 5px 12px; font-size: 13px; font-weight: 600;
+          background: var(--bg-2); border: 1px solid var(--line); color: var(--text-2, var(--text));
+          border-radius: var(--r-pill); cursor: pointer;
+        }
+        @media (hover: hover) and (pointer: fine) {
+          .team-compose-head .toggle-compose:hover { border-color: var(--muted-2); color: var(--text); }
+        }
+        .team-compose-head .toggle-compose:active { transform: scale(.97); }
+        .compose-collapsed-hint {
+          margin-top: 2px; padding: 12px 14px;
+          border: 1px dashed var(--line); border-radius: var(--r-md, 14px);
+          background: rgba(255,255,255,.02); color: var(--muted);
+          font-size: 13px; cursor: pointer; user-select: none;
+        }
+        .compose-collapsed-hint b { color: var(--accent); }
 
         .teams-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; }
         .team-card {
