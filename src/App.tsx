@@ -134,52 +134,6 @@ function detectViewerFromURL(): boolean {
   } catch { return false; }
 }
 
-// ===== Unified Supabase persistence (app_state JSON; no login required if RLS allows) =====
-const APP_STATE_ID = "default";
-type AppPersist = PersistShape;
-
-async function loadSupabaseClient(): Promise<any | null> {
-  const w: any = globalThis as any;
-  if (w?.supabase) return w.supabase;
-  const candidates = [
-    "./supabaseClient", "../supabaseClient", "../../supabaseClient", "../../../supabaseClient",
-    "./lib/supabaseClient", "../lib/supabaseClient", "../../lib/supabaseClient"
-  ];
-  for (const c of candidates) {
-    try {
-      const mod: any = await import(/* @vite-ignore */ c);
-      const sb = mod?.supabase || mod?.default || mod;
-      if (sb) return sb;
-    } catch {}
-  }
-  return null;
-}
-
-function isBlankPersist(s: AppPersist | null | undefined): boolean {
-  try {
-    const noPlayers = !Array.isArray(s?.players) || s!.players.length === 0;
-    const sess = (s as any)?.sessionsByDate || {};
-    const noSessions = !sess || Object.keys(sess).length === 0;
-    return noPlayers && noSessions;
-  } catch { return false; }
-}
-
-async function loadPersistFromSupabase(): Promise<AppPersist | null> {
-  try {
-    const sb = await loadSupabaseClient(); if (!sb) return null;
-    const { data, error } = await sb.from("app_state").select("state").eq("id", APP_STATE_ID).maybeSingle();
-    if (error) return null;
-    return (data?.state as AppPersist) ?? null;
-  } catch { return null; }
-}
-
-async function savePersistToSupabase(state: AppPersist): Promise<void> {
-  try {
-    const sb = await loadSupabaseClient(); if (!sb) return;
-    if (isBlankPersist(state)) return;
-    await sb.from("app_state").upsert({ id: APP_STATE_ID, state, updated_at: new Date().toISOString() }, { onConflict: "id" });
-  } catch {}
-}
 const SS_PIN_AUTHED = "goldin_futsal_admin_authed";
 const FIXED_PIN_HASH = "350c94d619f6aba3379500ff11bfcca6e58b0afe5b3624d0ad56fa607845e38c"; // sha256("8347")
 
@@ -458,6 +412,33 @@ function getQueryFlag(...keys: string[]) {
 const pickState = (x: any) => ({
   players: x?.players, teamNames: x?.teamNames, sessionsByDate: x?.sessionsByDate, sessionDate: x?.sessionDate,
 });
+
+/* ===== 데이터 유실 방지 가드 =====
+ * 서버의 마지막 값과 비교해서 경기 기록/선수가 크게 줄어드는 저장은 막는다.
+ * (하루치 경기 삭제처럼 정상적인 작은 삭제는 허용) */
+function countMatches(x: any): number {
+  const s = x?.sessionsByDate; if (!s || typeof s !== "object") return 0;
+  return Object.values(s).reduce((n: number, v: any) => n + (Array.isArray(v?.matches) ? v.matches.length : 0), 0);
+}
+function countDays(x: any): number {
+  const s = x?.sessionsByDate; if (!s || typeof s !== "object") return 0;
+  return Object.values(s).filter((v: any) => Array.isArray(v?.matches) && v.matches.length > 0).length;
+}
+function countPlayers(x: any): number { return Array.isArray(x?.players) ? x.players.length : 0; }
+
+function dataLossGuard(server: any, next: any): string | null {
+  const sm = countMatches(server), nm = countMatches(next);
+  const sd = countDays(server), nd = countDays(next);
+  const sp = countPlayers(server), np = countPlayers(next);
+  if (!next || typeof next !== "object" || !Array.isArray(next.players) || !next.sessionsByDate)
+    return "저장하려는 데이터 형식이 올바르지 않습니다";
+  if (sm > 0 && nm === 0) return `서버의 경기 기록 ${sm}개가 모두 사라집니다`;
+  if (sm - nm > 12) return `경기 기록이 ${sm}개 → ${nm}개로 ${sm - nm}개 줄어듭니다`;
+  if (sd - nd > 1) return `경기한 날짜가 ${sd}일 → ${nd}일로 줄어듭니다`;
+  if (sp > 0 && np === 0) return `선수 ${sp}명이 모두 사라집니다`;
+  if (sp - np > 3) return `선수가 ${sp}명 → ${np}명으로 ${sp - np}명 줄어듭니다`;
+  return null;
+}
 
 /* ====== 순위 계산 유틸 ====== */
 type StandingRow = { team: TeamId; pts: number; gf: number; ga: number; gd: number; w: number; d: number; l: number };
@@ -953,18 +934,7 @@ export default function App() {
   const [viewerMode] = useState<boolean>(() => detectViewerFromURL());
 
   
-  // ---- Hydrate from Supabase on mount ----
-useEffect(() => { (async () => {
-  try {
-    const server = await loadPersistFromSupabase();
-    if (server && !isBlankPersist(server)) {
-      setPlayers(server.players);
-      setGlobalTeamNames(server.teamNames);
-      setSessionsByDate(server.sessionsByDate);
-      setSessionDate(ensureSunday(server.sessionDate));
-    }
-  } catch {}
-})(); }, []);
+  // (레거시 app_state 자동 하이드레이션 제거: 오래된 데이터가 최신 기록을 덮어쓸 수 있었음)
 const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
   // 팀 구성 영역 접기/펼치기 (경기 기록 편의용, 화면 표시 전용 · localStorage 저장)
   const [teamComposeHidden, setTeamComposeHidden] = useState<boolean>(() => {
@@ -1021,8 +991,17 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
   const readonly = !authed;
 
   const initialCloud = useMemo(() => ({ players, teamNames: globalTeamNames, sessionsByDate, sessionDate }), []);
-  const { value: cloud, setValue: setCloud, ready } =
-    useRealtimeJsonState<typeof initialCloud>(initialCloud, { id: 1, readonly } as any);
+  const { value: cloud, setValue: setCloud, ready, status: syncStatus, lastError: syncError } =
+    useRealtimeJsonState<typeof initialCloud>(initialCloud, {
+      id: 1,
+      readonly,
+      guard: dataLossGuard,
+      onBlocked: (reason) => window.confirm(
+        `⚠️ 데이터 보호: ${reason}.\n\n` +
+        `실수일 가능성이 높아 서버 저장을 멈췄습니다.\n` +
+        `정말 의도한 변경이면 [확인], 아니면 [취소] 후 새로고침하세요.`
+      ),
+    });
 
   // ── Realtime 수신 시 로컬 state 반영 (중복 제거: 이 하나만 유지)
   useEffect(() => {
@@ -1829,6 +1808,21 @@ const setGkAward = (pid: string | null) => {
             className={theme === "worldcup" ? "seg on wc" : "seg"}
             onClick={() => { setTheme("worldcup"); localStorage.setItem("app-theme", "worldcup"); }}
           >🌍 월드컵</button>
+        </div>
+      )}
+
+      {syncStatus === "loading" && (
+        <div className="sync-banner info">서버에서 기록을 불러오는 중… (불러오기 전에는 저장하지 않습니다)</div>
+      )}
+      {syncStatus === "load-error" && (
+        <div className="sync-banner warn">
+          ⚠️ 서버에서 기록을 불러오지 못했습니다. 데이터 보호를 위해 저장을 멈췄고 자동으로 다시 시도합니다.
+          {syncError ? <small> ({syncError})</small> : null}
+        </div>
+      )}
+      {syncStatus === "blocked" && (
+        <div className="sync-banner warn">
+          ⚠️ 데이터 보호: 기록이 크게 줄어드는 저장을 막았습니다{syncError ? ` — ${syncError}` : ""}. 새로고침해 주세요.
         </div>
       )}
 
@@ -3064,6 +3058,10 @@ const setGkAward = (pid: string | null) => {
           -webkit-backdrop-filter: blur(18px) saturate(140%);
           box-shadow: var(--shadow-md), var(--ring);
         }
+        .sync-banner { margin: 10px 0 0; padding: 10px 14px; border-radius: var(--r-md); font-size: 13px; font-weight: 600; line-height: 1.45; }
+        .sync-banner.info { background: rgba(120,160,255,.12); color: var(--text); border: 1px solid rgba(120,160,255,.35); }
+        .sync-banner.warn { background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger); }
+        .sync-banner small { font-weight: 400; opacity: .8; }
         .badge-view { font-size:11px; color: var(--danger); font-weight:700; padding:3px 9px; border-radius: var(--r-pill); background: var(--danger-soft); }
         .label-strong { font-weight:700; color: var(--text); font-size: 13px; }
         .ok { color: var(--accent); font-weight:700; font-size: 13px; display:inline-flex; align-items:center; gap:5px; }

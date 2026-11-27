@@ -1,57 +1,114 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "./supabase";
 
-type Opts = {
+/**
+ * 쓰기 직전 검사 함수.
+ * - null 반환 → 그대로 저장
+ * - 문자열 반환 → 위험한 변경. 사유(문자열)를 들고 저장을 보류
+ */
+export type WriteGuard<T> = (serverValue: T, nextValue: T) => string | null;
+
+type Opts<T> = {
   table?: string;
-  id?: string;
+  id?: string | number;
   debounceMs?: number;
-  readonly?: boolean; // true면 Supabase에 절대 write하지 않음
+  readonly?: boolean;              // true면 Supabase에 절대 write하지 않음
+  guard?: WriteGuard<T>;           // 대량 삭제 등 위험한 덮어쓰기 차단
+  onBlocked?: (reason: string, next: T) => boolean; // true 반환 시 사용자가 강제 저장 승인
 };
 
+export type SyncStatus =
+  | "loading"      // 서버에서 아직 못 불러옴 → 쓰기 금지
+  | "ok"           // 서버 데이터 로드 완료 → 쓰기 허용
+  | "load-error"   // 서버 로드 실패 → 쓰기 금지(재시도 중)
+  | "blocked";     // 위험한 덮어쓰기를 막음
+
 /**
- * Keep a JSON state in sync with a single row in Supabase (table `futsal_state`).
- * - Reads once on mount
- * - Subscribes to realtime UPDATE/INSERT on the same row id
- * - Writes (UPSERT) with debounce whenever local state changes
- *   → readonly=true 이면 write 완전 차단 (비인증 접속자 보호)
- * - Falls back gracefully if Supabase is misconfigured (console.warn only)
+ * 단일 row(JSON) 를 Supabase(`futsal_state`)와 동기화.
+ *
+ * ⚠️ 데이터 유실 방지 원칙
+ *  1) 서버에서 "성공적으로" 불러오기 전에는 절대 쓰지 않는다.
+ *     (로드 실패 시 초기값/기본값이 서버를 덮어쓰던 버그의 원인)
+ *  2) 서버 row 가 있는데 payload 가 비어 있으면 = 비정상 → 쓰지 않는다.
+ *  3) 저장 직전 guard 로 서버 마지막 값과 비교해, 경기기록/선수가 크게 줄면 차단.
+ *  (서버 쪽 이력 백업/차단은 supabase/protect_futsal_state.sql 참고)
  */
-export function useRealtimeJsonState<T>(initial: T, opts: Opts = {}) {
+export function useRealtimeJsonState<T>(initial: T, opts: Opts<T> = {}) {
   const table = opts.table ?? "futsal_state";
   const id = opts.id ?? "main";
   const debounceMs = opts.debounceMs ?? 500;
   const readonly = opts.readonly ?? false;
 
-  const [value, setValue] = useState<T>(initial);
-  const [ready, setReady] = useState(false);
-  const skipNext = useRef(false);
-  const timer = useRef<number | null>(null);
+  const [value, setValueRaw] = useState<T>(initial);
+  const [status, setStatus] = useState<SyncStatus>("loading");
+  const [ready, setReady] = useState(false);       // 서버 로드 성공 여부 (= 쓰기 가능)
+  const [lastError, setLastError] = useState<string | null>(null);
 
-  // Load once
+  // 서버에 마지막으로 존재한다고 확인된 값 (로드/실시간/저장 성공 시 갱신)
+  const serverRef = useRef<T | null>(null);
+  const loadedRef = useRef(false);
+  // 사용자가 직접 바꾼 값만 저장하도록: 외부(서버)에서 온 값은 dirty=false
+  const dirtyRef = useRef(false);
+  const timer = useRef<number | null>(null);
+  const guardRef = useRef(opts.guard);
+  const onBlockedRef = useRef(opts.onBlocked);
+  guardRef.current = opts.guard;
+  onBlockedRef.current = opts.onBlocked;
+
+  /** 앱에서 호출하는 setter — 사용자 변경으로 간주 */
+  const setValue = useCallback((next: T) => {
+    dirtyRef.current = true;
+    setValueRaw(next);
+  }, []);
+
+  // ---- Load (실패 시 재시도, 성공 전까지 쓰기 금지) ----
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: number | null = null;
+    let attempt = 0;
+
     async function load() {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from(table)
           .select("payload")
           .eq("id", id)
-          .single();
-        if (!cancelled && data?.payload) {
-          skipNext.current = true;
-          setValue(data.payload as T);
+          .maybeSingle();
+        if (cancelled) return;
+        if (error) throw error;
+
+        if (data && data.payload && typeof data.payload === "object") {
+          serverRef.current = data.payload as T;
+          dirtyRef.current = false;
+          setValueRaw(data.payload as T);
+        } else if (data) {
+          // row 는 있는데 payload 가 비어 있음 → 비정상. 덮어쓰지 않도록 쓰기 금지 유지
+          throw new Error("서버 데이터(payload)가 비어 있습니다");
+        } else {
+          // row 자체가 안 보임 → 권한(RLS) 문제나 일시 오류일 수 있음.
+          // 기본값으로 서버를 덮어쓰지 않도록 쓰기 금지 유지.
+          // (완전 신규 설치라면 Supabase에서 row 를 먼저 만들어 주세요: README 참고)
+          throw new Error("서버에 데이터 row(id=" + id + ")가 없습니다");
         }
-      } catch (e) {
-        console.warn("[realtime] load failed", e);
-      } finally {
-        if (!cancelled) setReady(true);
+        loadedRef.current = true;
+        setLastError(null);
+        setStatus("ok");
+        setReady(true);
+      } catch (e: any) {
+        if (cancelled) return;
+        console.warn("[realtime] load failed — 쓰기 차단, 재시도 예정", e);
+        setLastError(String(e?.message ?? e));
+        setStatus("load-error");
+        attempt += 1;
+        const delay = Math.min(30000, 1000 * 2 ** Math.min(attempt, 5));
+        retryTimer = window.setTimeout(load, delay);
       }
     }
     load();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; if (retryTimer) window.clearTimeout(retryTimer); };
   }, [table, id]);
 
-  // Subscribe to realtime
+  // ---- Realtime 구독 ----
   useEffect(() => {
     const ch = supabase
       .channel(`rt-${table}-${id}`)
@@ -60,42 +117,57 @@ export function useRealtimeJsonState<T>(initial: T, opts: Opts = {}) {
         { event: "*", schema: "public", table, filter: `id=eq.${id}` },
         (payload: any) => {
           const rec = payload.new || payload.record;
-          if (rec?.payload) {
-            skipNext.current = true;
-            setValue(rec.payload as T);
+          if (rec?.payload && typeof rec.payload === "object") {
+            serverRef.current = rec.payload as T;
+            dirtyRef.current = false;
+            setValueRaw(rec.payload as T);
           }
         }
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    return () => { supabase.removeChannel(ch); };
   }, [table, id]);
 
-  // Debounced write on change — readonly=true면 완전 차단
+  // ---- Debounced write (가드 통과 시에만) ----
   useEffect(() => {
-    if (!ready) return;
-    if (readonly) return;          // ← 비인증 상태면 upsert 절대 안 함
-    if (skipNext.current) {
-      skipNext.current = false;
-      return;
-    }
+    if (!ready || !loadedRef.current) return;   // 서버 로드 성공 전 절대 쓰지 않음
+    if (readonly) return;                        // 비인증 접속자는 쓰지 않음
+    if (!dirtyRef.current) return;               // 서버에서 온 값은 다시 쓰지 않음
+
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(async () => {
+      const next = value;
+      const server = serverRef.current;
+
+      if (server && guardRef.current) {
+        const reason = guardRef.current(server, next);
+        if (reason) {
+          const force = onBlockedRef.current?.(reason, next) ?? false;
+          if (!force) {
+            console.warn("[realtime] 위험한 저장 차단:", reason);
+            setStatus("blocked");
+            setLastError(reason);
+            return;
+          }
+        }
+      }
+
       try {
         const { error } = await supabase
           .from(table)
-          .upsert({ id, payload: value }, { onConflict: "id" });
-        if (error) {
-          console.warn("[realtime] upsert error", error);
-        }
-      } catch (e) {
+          .upsert({ id, payload: next }, { onConflict: "id" });
+        if (error) throw error;
+        serverRef.current = next;
+        dirtyRef.current = false;
+        setStatus("ok");
+        setLastError(null);
+      } catch (e: any) {
         console.warn("[realtime] upsert failed", e);
+        setLastError(String(e?.message ?? e));
       }
     }, debounceMs);
     return () => { if (timer.current) window.clearTimeout(timer.current); };
   }, [value, ready, readonly, table, id, debounceMs]);
 
-  return { value, setValue, ready };
+  return { value, setValue, ready, status, lastError };
 }

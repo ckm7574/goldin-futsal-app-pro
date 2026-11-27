@@ -37,3 +37,10 @@ create policy if not exists "allow anon update" on public.futsal_state for updat
 
 alter publication supabase_realtime add table public.futsal_state;
 ```
+
+## 데이터 보호 (필수 1회 설정)
+기록이 기본값으로 덮어써지는 사고를 막기 위해, Supabase 대시보드 → SQL Editor에서
+`supabase/protect_futsal_state.sql`을 한 번 실행하세요.
+- 모든 변경 직전 값을 `futsal_state_history`에 자동 백업 (최근 500개)
+- 경기 기록/선수가 대량으로 사라지는 저장은 DB가 거부
+- 앱도 서버에서 불러오기에 성공하기 전에는 절대 저장하지 않습니다
