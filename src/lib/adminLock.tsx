@@ -200,8 +200,12 @@ export function useAdminLock(opts: { onLost?: (reason: LostReason) => void } = {
     activeRef.current = false; // 저장 자체가 서버 활동 갱신
   }, [ping, lose]);
 
+  /** 현재 관리자 토큰 (사진 올리기/정리용). 관리자가 아니면 null */
+  const getToken = useCallback(() => tokenRef.current, []);
+
   return {
     isHolder: !!token,
+    getToken,
     checking,
     status,
     label,

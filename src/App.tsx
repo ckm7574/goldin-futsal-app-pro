@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRealtimeJsonState } from "./lib/realtimeStore";
 import { useAdminLock } from "./lib/adminLock";
+import { uploadPlayerPhoto, markPhotoForCleanup, cleanupUnusedPhotos } from "./lib/playerPhotos";
 import FifaSection from "./components/FifaSection.supabase";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -640,44 +641,14 @@ function FormationPreview({
   };
 
   const gkPt = pts[0];
-  const cardRef = React.useRef<HTMLDivElement>(null);
-
-  const handleSaveImage = async () => {
-    const el = cardRef.current;
-    if (!el) return;
-    // html2canvas로 DOM 그대로 캡처 (CSS 변수·사진 모두 반영)
-    const { default: html2canvas } = await import("html2canvas");
-    const canvas = await html2canvas(el, {
-      scale: 3,
-      useCORS: true,
-      backgroundColor: "#0D1016",
-    });
-    canvas.toBlob(blob => {
-      if (!blob) return;
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `${teamName}_${formation}_포메이션.png`;
-      link.click();
-    }, "image/png");
-  };
-
   return (
-    <div className="formation-card" ref={cardRef}>
+    <div className="formation-card">
       <div className="formation-title" style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <span>
           {teamName}
           <span className="subtle"> ({team}) · {formation}</span>
           <span style={{ display:"inline-block", width:10, height:10, borderRadius:3, background:ringColor, marginLeft:7, verticalAlign:"middle", opacity:.9 }} />
         </span>
-        <button
-          onClick={handleSaveImage}
-          style={{
-            background:"none", border:"1px solid var(--line)",
-            borderRadius:6, padding:"3px 9px", cursor:"pointer",
-            color:"var(--fg)", fontSize:11, display:"flex", alignItems:"center", gap:4
-          }}
-          title="포메이션 이미지 저장"
-        >📷 저장</button>
       </div>
       <svg viewBox="0 0 200 280" className="pitch">
         {/* 피치 배경 */}
@@ -1004,7 +975,10 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
     useRealtimeJsonState<typeof initialCloud>(initialCloud, {
       id: 1,
       readonly,
-      save: adminLock.save,
+      save: async (payload) => {
+        await adminLock.save(payload);
+        cleanupUnusedPhotos(adminLock.getToken(), payload); // 저장된 기록에 없는 옛 사진만 정리
+      },
       guard: dataLossGuard,
       onBlocked: (reason) => window.confirm(
         `⚠️ 데이터 보호: ${reason}.\n\n` +
@@ -1122,6 +1096,38 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
     }
   }
   function lock() { adminLock.release(); }
+
+  // ===== 선수 사진 (Supabase 파일 저장소) =====
+  const [photoBusy, setPhotoBusy] = useState<Record<string, boolean>>({});
+  const photoBusyRef = useRef<Set<string>>(new Set()); // 같은 선수 사진을 동시에 두 번 올리는 것 방지
+  async function changePlayerPhoto(playerId: string, file: File) {
+    const token = adminLock.getToken();
+    if (readonly || !token) return alert("관리자 모드에서만 사진을 바꿀 수 있습니다.");
+    if (photoBusyRef.current.has(playerId)) return;
+    photoBusyRef.current.add(playerId);
+    setPhotoBusy(b => ({ ...b, [playerId]: true }));
+    try {
+      const url = await uploadPlayerPhoto(token, playerId, file);
+      setPlayers(prev => prev.map(x => {
+        if (x.id !== playerId) return x;
+        markPhotoForCleanup(x.photo); // 예전 사진은 기록 저장 후 정리
+        return { ...x, photo: url };
+      }));
+    } catch (e: any) {
+      alert(`사진을 올리지 못했습니다.\n${e?.message ?? e}`);
+    } finally {
+      photoBusyRef.current.delete(playerId);
+      setPhotoBusy(b => { const n = { ...b }; delete n[playerId]; return n; });
+    }
+  }
+  function removePlayerPhoto(playerId: string) {
+    if (readonly) return;
+    setPlayers(prev => prev.map(x => {
+      if (x.id !== playerId) return x;
+      markPhotoForCleanup(x.photo);
+      return { ...x, photo: null };
+    }));
+  }
   function copyViewerLink() { const url = new URL(window.location.href); url.searchParams.set("viewer", "1"); navigator.clipboard?.writeText(url.toString()); alert("보기 전용 링크가 복사되었습니다"); }
 
   const cur: Session = useMemo(() => sessionsByDate[ensureSunday(sessionDate)] ?? emptySession(), [sessionsByDate, sessionDate]);
@@ -1915,35 +1921,22 @@ const setGkAward = (pid: string | null) => {
                       ? <img src={p.photo} alt={p.name} className="player-photo-thumb" />
                       : <span className="player-photo-placeholder">{p.name.slice(0,1)}</span>
                     }
+                    {photoBusy[p.id] && <span className="player-photo-busy" aria-label="사진 올리는 중" />}
                     {!readonly && (
                       <input type="file" accept="image/*" style={{ display: "none" }}
+                        disabled={!!photoBusy[p.id]}
                         onChange={e => {
-                          const file = e.target.files?.[0]; if (!file) return;
-                          // Canvas로 리사이즈 + JPEG 압축 (최대 200px, 품질 0.82)
-                          const img = new window.Image();
-                          const objUrl = URL.createObjectURL(file);
-                          img.onload = () => {
-                            const MAX = 300;
-                            const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-                            const w = Math.round(img.width * scale);
-                            const h = Math.round(img.height * scale);
-                            const canvas = document.createElement("canvas");
-                            canvas.width = w; canvas.height = h;
-                            canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
-                            // PNG로 저장 — 투명 배경(SVG/PNG) 유지, JPEG는 투명도를 검정으로 변환함
-            const dataUrl = canvas.toDataURL("image/png");
-                            URL.revokeObjectURL(objUrl);
-                            setPlayers(prev => prev.map(x => x.id === p.id ? { ...x, photo: dataUrl } : x));
-                          };
-                          img.src = objUrl;
+                          const file = e.target.files?.[0];
                           e.target.value = "";
+                          if (file) changePlayerPhoto(p.id, file);
                         }}
                       />
                     )}
                   </label>
                   {p.photo && !readonly && (
                     <button className="player-photo-del" title="사진 삭제"
-                      onClick={() => setPlayers(prev => prev.map(x => x.id === p.id ? { ...x, photo: null } : x))}
+                      disabled={!!photoBusy[p.id]}
+                      onClick={() => removePlayerPhoto(p.id)}
                     >✕</button>
                   )}
                 </div>
@@ -3227,6 +3220,9 @@ const setGkAward = (pid: string | null) => {
         .player-photo-upload:hover { border-color:var(--gold); }
         .player-photo-thumb { width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
         .player-photo-placeholder { font-size:18px; font-weight:800; color:var(--gold); user-select:none; }
+        .player-photo-busy { position:absolute; inset:0; border-radius:50%; background:rgba(0,0,0,.55); }
+        .player-photo-busy::after { content:""; position:absolute; left:50%; top:50%; width:18px; height:18px; margin:-9px 0 0 -9px; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; border-radius:50%; animation: photo-spin .8s linear infinite; }
+        @keyframes photo-spin { to { transform: rotate(360deg); } }
         .player-photo-del { padding:1px 5px; font-size:10px; background:#2a0a0a; border-color:#5a2020; color:#ff8a8a; border-radius:999px; cursor:pointer; }
         .player-photo-del:hover { background:#3a1010; }
 

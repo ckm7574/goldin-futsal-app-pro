@@ -52,3 +52,9 @@ alter publication supabase_realtime add table public.futsal_state;
 - PIN 을 맞게 입력하면 확인창 후 권한을 가져올 수 있고, 기존 관리자는 즉시 보기 전용으로 전환
 - 데이터 저장은 관리자 토큰을 가진 사람만 가능 (`futsal_save` 함수)
 - PIN 변경 / 관리자 강제 해제 방법은 SQL 파일 하단 참고
+
+## 선수 사진 (Supabase 파일 저장소)
+`supabase/player_photos_storage.sql` 을 SQL Editor 에서 1회 실행하세요.
+- 사진은 `player-photos` 저장소에 보관하고, 기록 데이터에는 사진 주소만 저장 (저장 속도 개선)
+- 사진 올리기/지우기는 현재 관리자만 가능 (서버가 발급한 5분짜리 1회용 허가 필요)
+- 기존 base64 사진 이전: `scripts/migrate_photos_to_storage.py` (실행 방법은 파일 상단 참고)
