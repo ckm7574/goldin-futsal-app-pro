@@ -15,7 +15,7 @@ npm run dev
 ## Vercel 배포 설정
 - Build Command: `npm run build`
 - Output Directory: `dist`
-- Node: 20.x
+- Node: 26.x
 
 ### 환경 변수
 - `VITE_SUPABASE_URL` = Supabase Project URL
