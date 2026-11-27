@@ -1843,6 +1843,12 @@ const setGkAward = (pid: string | null) => {
           {syncError ? <small> ({syncError})</small> : null}
         </div>
       )}
+      {syncStatus === "save-error" && authed && (
+        <div className="sync-banner warn">
+          ⚠️ 서버에 저장하지 못했습니다. 화면의 변경 내용은 그대로 두고 자동으로 다시 저장을 시도합니다. 이 창을 닫지 마세요.
+          {syncError ? <small> ({syncError})</small> : null}
+        </div>
+      )}
       {syncStatus === "blocked" && (
         <div className="sync-banner warn">
           ⚠️ 데이터 보호: 기록이 크게 줄어드는 저장을 막았습니다{syncError ? ` — ${syncError}` : ""}. 새로고침해 주세요.

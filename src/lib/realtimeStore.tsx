@@ -23,6 +23,7 @@ export type SyncStatus =
   | "loading"      // 서버에서 아직 못 불러옴 → 쓰기 금지
   | "ok"           // 서버 데이터 로드 완료 → 쓰기 허용
   | "load-error"   // 서버 로드 실패 → 쓰기 금지(재시도 중)
+  | "save-error"   // 저장 실패 → 자동 재시도 중 (화면 변경은 아직 서버에 없음)
   | "blocked";     // 위험한 덮어쓰기를 막음
 
 /**
@@ -46,6 +47,9 @@ export function useRealtimeJsonState<T>(initial: T, opts: Opts<T> = {}) {
   const [ready, setReady] = useState(false);       // 서버 로드 성공 여부 (= 쓰기 가능)
   const [lastError, setLastError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  const [saveRetryTick, setSaveRetryTick] = useState(0);
+  const saveFailCountRef = useRef(0);
+  const saveRetryTimer = useRef<number | null>(null);
   const prevReadonlyRef = useRef(readonly);
 
   // 보기 전용 → 관리자로 바뀔 때: 화면 데이터가 오래됐을 수 있으니 서버에서 다시 불러온 뒤에만 저장 허용
@@ -182,15 +186,37 @@ export function useRealtimeJsonState<T>(initial: T, opts: Opts<T> = {}) {
         }
         serverRef.current = next;
         dirtyRef.current = false;
+        saveFailCountRef.current = 0;
         setStatus("ok");
         setLastError(null);
       } catch (e: any) {
-        console.warn("[realtime] upsert failed", e);
-        setLastError(String(e?.message ?? e));
+        const msg = String(e?.message ?? e);
+        console.warn("[realtime] save failed", e);
+        setLastError(msg);
+        // 권한을 잃은 경우는 보기 전용으로 전환되므로 재시도하지 않음
+        if (/not_lock_holder|관리자 권한/.test(msg)) return;
+        setStatus("save-error");
+        // 변경 내용은 그대로 두고(dirty 유지) 자동 재시도: 3s, 6s, 12s ... 최대 30s
+        saveFailCountRef.current += 1;
+        const delay = Math.min(30000, 3000 * 2 ** Math.min(saveFailCountRef.current - 1, 4));
+        if (saveRetryTimer.current) window.clearTimeout(saveRetryTimer.current);
+        saveRetryTimer.current = window.setTimeout(() => setSaveRetryTick(t => t + 1), delay);
       }
     }, debounceMs);
     return () => { if (timer.current) window.clearTimeout(timer.current); };
-  }, [value, ready, readonly, table, id, debounceMs]);
+  }, [value, ready, readonly, table, id, debounceMs, saveRetryTick]);
+
+  // 저장 안 된 변경이 있으면 창 닫기/새로고침 전에 경고
+  useEffect(() => {
+    const onBeforeUnload = (ev: BeforeUnloadEvent) => {
+      if (!readonly && dirtyRef.current && loadedRef.current) {
+        ev.preventDefault();
+        ev.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [readonly]);
 
   return { value, setValue, ready, status, lastError };
 }
