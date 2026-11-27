@@ -1,6 +1,7 @@
 /* App.tsx — 팀별 조끼 색 포메이션 미리보기 + 랭킹 보드 개선 포함 */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRealtimeJsonState } from "./lib/realtimeStore";
+import { useAdminLock } from "./lib/adminLock";
 import FifaSection from "./components/FifaSection.supabase";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -134,54 +135,7 @@ function detectViewerFromURL(): boolean {
   } catch { return false; }
 }
 
-// ===== Unified Supabase persistence (app_state JSON; no login required if RLS allows) =====
-const APP_STATE_ID = "default";
-type AppPersist = PersistShape;
-
-async function loadSupabaseClient(): Promise<any | null> {
-  const w: any = globalThis as any;
-  if (w?.supabase) return w.supabase;
-  const candidates = [
-    "./supabaseClient", "../supabaseClient", "../../supabaseClient", "../../../supabaseClient",
-    "./lib/supabaseClient", "../lib/supabaseClient", "../../lib/supabaseClient"
-  ];
-  for (const c of candidates) {
-    try {
-      const mod: any = await import(/* @vite-ignore */ c);
-      const sb = mod?.supabase || mod?.default || mod;
-      if (sb) return sb;
-    } catch {}
-  }
-  return null;
-}
-
-function isBlankPersist(s: AppPersist | null | undefined): boolean {
-  try {
-    const noPlayers = !Array.isArray(s?.players) || s!.players.length === 0;
-    const sess = (s as any)?.sessionsByDate || {};
-    const noSessions = !sess || Object.keys(sess).length === 0;
-    return noPlayers && noSessions;
-  } catch { return false; }
-}
-
-async function loadPersistFromSupabase(): Promise<AppPersist | null> {
-  try {
-    const sb = await loadSupabaseClient(); if (!sb) return null;
-    const { data, error } = await sb.from("app_state").select("state").eq("id", APP_STATE_ID).maybeSingle();
-    if (error) return null;
-    return (data?.state as AppPersist) ?? null;
-  } catch { return null; }
-}
-
-async function savePersistToSupabase(state: AppPersist): Promise<void> {
-  try {
-    const sb = await loadSupabaseClient(); if (!sb) return;
-    if (isBlankPersist(state)) return;
-    await sb.from("app_state").upsert({ id: APP_STATE_ID, state, updated_at: new Date().toISOString() }, { onConflict: "id" });
-  } catch {}
-}
-const SS_PIN_AUTHED = "goldin_futsal_admin_authed";
-const FIXED_PIN_HASH = "350c94d619f6aba3379500ff11bfcca6e58b0afe5b3624d0ad56fa607845e38c"; // sha256("8347")
+// 관리자 PIN 은 서버(Supabase admin_unlock)에서만 확인합니다. 앱 코드에는 PIN 이 없습니다.
 
 /* 팀별 조끼 색 (필요시 여기만 변경) */
 const TEAM_PINNIES: Record<TeamId, "red" | "yellow" | "green" | "white" > = { A: "red", B: "yellow", C: "green", D: "white" };
@@ -458,6 +412,33 @@ function getQueryFlag(...keys: string[]) {
 const pickState = (x: any) => ({
   players: x?.players, teamNames: x?.teamNames, sessionsByDate: x?.sessionsByDate, sessionDate: x?.sessionDate,
 });
+
+/* ===== 데이터 유실 방지 가드 =====
+ * 서버의 마지막 값과 비교해서 경기 기록/선수가 크게 줄어드는 저장은 막는다.
+ * (하루치 경기 삭제처럼 정상적인 작은 삭제는 허용) */
+function countMatches(x: any): number {
+  const s = x?.sessionsByDate; if (!s || typeof s !== "object") return 0;
+  return Object.values(s).reduce((n: number, v: any) => n + (Array.isArray(v?.matches) ? v.matches.length : 0), 0);
+}
+function countDays(x: any): number {
+  const s = x?.sessionsByDate; if (!s || typeof s !== "object") return 0;
+  return Object.values(s).filter((v: any) => Array.isArray(v?.matches) && v.matches.length > 0).length;
+}
+function countPlayers(x: any): number { return Array.isArray(x?.players) ? x.players.length : 0; }
+
+function dataLossGuard(server: any, next: any): string | null {
+  const sm = countMatches(server), nm = countMatches(next);
+  const sd = countDays(server), nd = countDays(next);
+  const sp = countPlayers(server), np = countPlayers(next);
+  if (!next || typeof next !== "object" || !Array.isArray(next.players) || !next.sessionsByDate)
+    return "저장하려는 데이터 형식이 올바르지 않습니다";
+  if (sm > 0 && nm === 0) return `서버의 경기 기록 ${sm}개가 모두 사라집니다`;
+  if (sm - nm > 12) return `경기 기록이 ${sm}개 → ${nm}개로 ${sm - nm}개 줄어듭니다`;
+  if (sd - nd > 1) return `경기한 날짜가 ${sd}일 → ${nd}일로 줄어듭니다`;
+  if (sp > 0 && np === 0) return `선수 ${sp}명이 모두 사라집니다`;
+  if (sp - np > 3) return `선수가 ${sp}명 → ${np}명으로 ${sp - np}명 줄어듭니다`;
+  return null;
+}
 
 /* ====== 순위 계산 유틸 ====== */
 type StandingRow = { team: TeamId; pts: number; gf: number; ga: number; gd: number; w: number; d: number; l: number };
@@ -953,18 +934,7 @@ export default function App() {
   const [viewerMode] = useState<boolean>(() => detectViewerFromURL());
 
   
-  // ---- Hydrate from Supabase on mount ----
-useEffect(() => { (async () => {
-  try {
-    const server = await loadPersistFromSupabase();
-    if (server && !isBlankPersist(server)) {
-      setPlayers(server.players);
-      setGlobalTeamNames(server.teamNames);
-      setSessionsByDate(server.sessionsByDate);
-      setSessionDate(ensureSunday(server.sessionDate));
-    }
-  } catch {}
-})(); }, []);
+  // (레거시 app_state 자동 하이드레이션 제거: 오래된 데이터가 최신 기록을 덮어쓸 수 있었음)
 const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
   // 팀 구성 영역 접기/펼치기 (경기 기록 편의용, 화면 표시 전용 · localStorage 저장)
   const [teamComposeHidden, setTeamComposeHidden] = useState<boolean>(() => {
@@ -1016,13 +986,32 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
   }, [players, collate]);
   const activePlayersSorted = useMemo(() => playersSorted.filter(p => p.active), [playersSorted]);
 
-  // authed를 useRealtimeJsonState 보다 먼저 선언 — readonly 여부를 훅에 전달하기 위해
-  const [authed, setAuthed] = useState<boolean>(() => sessionStorage.getItem(SS_PIN_AUTHED) === "1");
+  // 관리자 잠금 (한 번에 한 명만) — useRealtimeJsonState 보다 먼저 선언
+  const adminLock = useAdminLock({
+    onLost: (reason) => {
+      setTimeout(() => alert(
+        reason === "takeover"
+          ? "다른 관리자가 잠금 해제하여 보기 전용으로 전환되었습니다."
+          : "2분 동안 동작이 없어 관리자 모드가 자동으로 잠겼습니다."
+      ), 0);
+    },
+  });
+  const authed = adminLock.isHolder;
   const readonly = !authed;
 
   const initialCloud = useMemo(() => ({ players, teamNames: globalTeamNames, sessionsByDate, sessionDate }), []);
-  const { value: cloud, setValue: setCloud, ready } =
-    useRealtimeJsonState<typeof initialCloud>(initialCloud, { id: 1, readonly } as any);
+  const { value: cloud, setValue: setCloud, ready, status: syncStatus, lastError: syncError } =
+    useRealtimeJsonState<typeof initialCloud>(initialCloud, {
+      id: 1,
+      readonly,
+      save: adminLock.save,
+      guard: dataLossGuard,
+      onBlocked: (reason) => window.confirm(
+        `⚠️ 데이터 보호: ${reason}.\n\n` +
+        `실수일 가능성이 높아 서버 저장을 멈췄습니다.\n` +
+        `정말 의도한 변경이면 [확인], 아니면 [취소] 후 새로고침하세요.`
+      ),
+    });
 
   // ── Realtime 수신 시 로컬 state 반영 (중복 제거: 이 하나만 유지)
   useEffect(() => {
@@ -1105,21 +1094,34 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
   // authed / readonly 는 위(useRealtimeJsonState 앞)에서 이미 선언됨
   const [pinInput, setPinInput] = useState("");
 
-  async function sha256Hex(input: string): Promise<string> {
-    const enc = new TextEncoder();
-    const w: any = globalThis as any;
-    if (!w.crypto?.subtle) return `plain:${input}`;
-    const buf = await w.crypto.subtle.digest("SHA-256", enc.encode(input));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-  }
+  const [unlocking, setUnlocking] = useState(false);
 
   async function unlock() {
     if (!pinInput) return alert("PIN을 입력하세요");
-    const h = await sha256Hex(pinInput);
-    if (h === FIXED_PIN_HASH) { sessionStorage.setItem(SS_PIN_AUTHED, "1"); setAuthed(true); setPinInput(""); }
-    else alert("PIN 불일치");
+    if (unlocking) return;
+    setUnlocking(true);
+    try {
+      let r = await adminLock.unlock(pinInput, false);
+      if (r.status === "busy") {
+        const who = r.holder_label || "다른 관리자";
+        const left = Math.max(0, r.expires_in_sec);
+        const ok = window.confirm(
+          `🔒 지금 ${who}님이 관리자 모드를 사용 중입니다.\n` +
+          `(${who}님이 잠그거나, 약 ${left}초 동안 동작이 없으면 자동으로 풀립니다)\n\n` +
+          `지금 관리자 권한을 가져올까요?\n` +
+          `[확인]을 누르면 ${who}님은 즉시 보기 전용으로 바뀝니다.`
+        );
+        if (!ok) return;
+        r = await adminLock.unlock(pinInput, true);
+      }
+      if (r.status === "ok") setPinInput("");
+      else if (r.status === "invalid_pin") alert("PIN 불일치");
+      else if (r.status === "error") alert(`잠금 해제 실패: ${r.message}`);
+    } finally {
+      setUnlocking(false);
+    }
   }
-  function lock() { sessionStorage.removeItem(SS_PIN_AUTHED); setAuthed(false); }
+  function lock() { adminLock.release(); }
   function copyViewerLink() { const url = new URL(window.location.href); url.searchParams.set("viewer", "1"); navigator.clipboard?.writeText(url.toString()); alert("보기 전용 링크가 복사되었습니다"); }
 
   const cur: Session = useMemo(() => sessionsByDate[ensureSunday(sessionDate)] ?? emptySession(), [sessionsByDate, sessionDate]);
@@ -1832,20 +1834,44 @@ const setGkAward = (pid: string | null) => {
         </div>
       )}
 
+      {syncStatus === "loading" && (
+        <div className="sync-banner info">서버에서 기록을 불러오는 중… (불러오기 전에는 저장하지 않습니다)</div>
+      )}
+      {syncStatus === "load-error" && (
+        <div className="sync-banner warn">
+          ⚠️ 서버에서 기록을 불러오지 못했습니다. 데이터 보호를 위해 저장을 멈췄고 자동으로 다시 시도합니다.
+          {syncError ? <small> ({syncError})</small> : null}
+        </div>
+      )}
+      {syncStatus === "blocked" && (
+        <div className="sync-banner warn">
+          ⚠️ 데이터 보호: 기록이 크게 줄어드는 저장을 막았습니다{syncError ? ` — ${syncError}` : ""}. 새로고침해 주세요.
+        </div>
+      )}
+
       <div className="panel">
         {viewerFlag && <span className="badge-view">보기 전용</span>}
         {authed ? <>
-          <span className="ok">관리자 모드</span>
+          <span className="ok">관리자 모드{adminLock.label ? ` · ${adminLock.label}` : ""}</span>
           <div className="panel-actions">
             <button onClick={lock}>잠금</button>
             <button onClick={copyViewerLink}>링크 복사</button>
             <button onClick={exportData}>내보내기</button>
           </div>
         </> : <>
+          {adminLock.status?.locked && (
+            <span className="lock-badge" title="다른 관리자가 잠그거나 2분 동안 동작이 없으면 자동으로 풀립니다">
+              🔒 {adminLock.status.holder_label || "다른 관리자"} 사용 중
+            </span>
+          )}
           <span className="label-strong">관리자 PIN</span>
-          <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="PIN 입력" style={{ flex: "1 1 120px", minWidth: 0 }} />
+          <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") unlock(); }}
+            placeholder="PIN 입력" style={{ flex: "1 1 100px", minWidth: 0 }} />
+          <input type="text" value={adminLock.label} onChange={e => adminLock.setLabel(e.target.value)}
+            placeholder="이름(선택)" maxLength={20} style={{ flex: "0 1 96px", minWidth: 0 }} />
           <div className="panel-actions">
-            <button onClick={unlock}>잠금 해제</button>
+            <button onClick={unlock} disabled={unlocking || adminLock.checking}>{unlocking ? "확인 중…" : "잠금 해제"}</button>
             <button onClick={copyViewerLink}>링크 복사</button>
           </div>
         </>}
@@ -3044,6 +3070,15 @@ const setGkAward = (pid: string | null) => {
           box-shadow: var(--ring);
         }
         .date-bar input[type="date"] { flex: 1 1 160px; min-width: 0; }
+        /* 달력(캘린더 피커) 버튼 아이콘 하얀색 */
+        input[type="date"] { color-scheme: dark; }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>") center / 20px 20px no-repeat !important;
+          width: 22px; height: 22px;
+          filter: none !important;
+          opacity: 1 !important;
+          cursor: pointer;
+        }
 
         /* ===== App bar (panel) — sleek sticky top bar ===== */
         .panel {
@@ -3055,6 +3090,11 @@ const setGkAward = (pid: string | null) => {
           -webkit-backdrop-filter: blur(18px) saturate(140%);
           box-shadow: var(--shadow-md), var(--ring);
         }
+        .lock-badge { font-size:12px; font-weight:700; padding:3px 10px; border-radius: var(--r-pill); background: rgba(255,170,0,.14); color:#ffb020; border:1px solid rgba(255,170,0,.4); white-space:nowrap; }
+        .sync-banner { margin: 10px 0 0; padding: 10px 14px; border-radius: var(--r-md); font-size: 13px; font-weight: 600; line-height: 1.45; }
+        .sync-banner.info { background: rgba(120,160,255,.12); color: var(--text); border: 1px solid rgba(120,160,255,.35); }
+        .sync-banner.warn { background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger); }
+        .sync-banner small { font-weight: 400; opacity: .8; }
         .badge-view { font-size:11px; color: var(--danger); font-weight:700; padding:3px 9px; border-radius: var(--r-pill); background: var(--danger-soft); }
         .label-strong { font-weight:700; color: var(--text); font-size: 13px; }
         .ok { color: var(--accent); font-weight:700; font-size: 13px; display:inline-flex; align-items:center; gap:5px; }
