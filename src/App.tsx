@@ -1,6 +1,7 @@
 /* App.tsx — 팀별 조끼 색 포메이션 미리보기 + 랭킹 보드 개선 포함 */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRealtimeJsonState } from "./lib/realtimeStore";
+import { useAdminLock } from "./lib/adminLock";
 import FifaSection from "./components/FifaSection.supabase";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -134,8 +135,7 @@ function detectViewerFromURL(): boolean {
   } catch { return false; }
 }
 
-const SS_PIN_AUTHED = "goldin_futsal_admin_authed";
-const FIXED_PIN_HASH = "350c94d619f6aba3379500ff11bfcca6e58b0afe5b3624d0ad56fa607845e38c"; // sha256("8347")
+// 관리자 PIN 은 서버(Supabase admin_unlock)에서만 확인합니다. 앱 코드에는 PIN 이 없습니다.
 
 /* 팀별 조끼 색 (필요시 여기만 변경) */
 const TEAM_PINNIES: Record<TeamId, "red" | "yellow" | "green" | "white" > = { A: "red", B: "yellow", C: "green", D: "white" };
@@ -986,8 +986,17 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
   }, [players, collate]);
   const activePlayersSorted = useMemo(() => playersSorted.filter(p => p.active), [playersSorted]);
 
-  // authed를 useRealtimeJsonState 보다 먼저 선언 — readonly 여부를 훅에 전달하기 위해
-  const [authed, setAuthed] = useState<boolean>(() => sessionStorage.getItem(SS_PIN_AUTHED) === "1");
+  // 관리자 잠금 (한 번에 한 명만) — useRealtimeJsonState 보다 먼저 선언
+  const adminLock = useAdminLock({
+    onLost: (reason) => {
+      setTimeout(() => alert(
+        reason === "takeover"
+          ? "다른 관리자가 잠금 해제하여 보기 전용으로 전환되었습니다."
+          : "2분 동안 동작이 없어 관리자 모드가 자동으로 잠겼습니다."
+      ), 0);
+    },
+  });
+  const authed = adminLock.isHolder;
   const readonly = !authed;
 
   const initialCloud = useMemo(() => ({ players, teamNames: globalTeamNames, sessionsByDate, sessionDate }), []);
@@ -995,6 +1004,7 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
     useRealtimeJsonState<typeof initialCloud>(initialCloud, {
       id: 1,
       readonly,
+      save: adminLock.save,
       guard: dataLossGuard,
       onBlocked: (reason) => window.confirm(
         `⚠️ 데이터 보호: ${reason}.\n\n` +
@@ -1084,21 +1094,34 @@ const [page, setPage] = useState<1 | 2 | 3 | 4 | 5>(2);
   // authed / readonly 는 위(useRealtimeJsonState 앞)에서 이미 선언됨
   const [pinInput, setPinInput] = useState("");
 
-  async function sha256Hex(input: string): Promise<string> {
-    const enc = new TextEncoder();
-    const w: any = globalThis as any;
-    if (!w.crypto?.subtle) return `plain:${input}`;
-    const buf = await w.crypto.subtle.digest("SHA-256", enc.encode(input));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-  }
+  const [unlocking, setUnlocking] = useState(false);
 
   async function unlock() {
     if (!pinInput) return alert("PIN을 입력하세요");
-    const h = await sha256Hex(pinInput);
-    if (h === FIXED_PIN_HASH) { sessionStorage.setItem(SS_PIN_AUTHED, "1"); setAuthed(true); setPinInput(""); }
-    else alert("PIN 불일치");
+    if (unlocking) return;
+    setUnlocking(true);
+    try {
+      let r = await adminLock.unlock(pinInput, false);
+      if (r.status === "busy") {
+        const who = r.holder_label || "다른 관리자";
+        const left = Math.max(0, r.expires_in_sec);
+        const ok = window.confirm(
+          `🔒 지금 ${who}님이 관리자 모드를 사용 중입니다.\n` +
+          `(${who}님이 잠그거나, 약 ${left}초 동안 동작이 없으면 자동으로 풀립니다)\n\n` +
+          `지금 관리자 권한을 가져올까요?\n` +
+          `[확인]을 누르면 ${who}님은 즉시 보기 전용으로 바뀝니다.`
+        );
+        if (!ok) return;
+        r = await adminLock.unlock(pinInput, true);
+      }
+      if (r.status === "ok") setPinInput("");
+      else if (r.status === "invalid_pin") alert("PIN 불일치");
+      else if (r.status === "error") alert(`잠금 해제 실패: ${r.message}`);
+    } finally {
+      setUnlocking(false);
+    }
   }
-  function lock() { sessionStorage.removeItem(SS_PIN_AUTHED); setAuthed(false); }
+  function lock() { adminLock.release(); }
   function copyViewerLink() { const url = new URL(window.location.href); url.searchParams.set("viewer", "1"); navigator.clipboard?.writeText(url.toString()); alert("보기 전용 링크가 복사되었습니다"); }
 
   const cur: Session = useMemo(() => sessionsByDate[ensureSunday(sessionDate)] ?? emptySession(), [sessionsByDate, sessionDate]);
@@ -1829,17 +1852,26 @@ const setGkAward = (pid: string | null) => {
       <div className="panel">
         {viewerFlag && <span className="badge-view">보기 전용</span>}
         {authed ? <>
-          <span className="ok">관리자 모드</span>
+          <span className="ok">관리자 모드{adminLock.label ? ` · ${adminLock.label}` : ""}</span>
           <div className="panel-actions">
             <button onClick={lock}>잠금</button>
             <button onClick={copyViewerLink}>링크 복사</button>
             <button onClick={exportData}>내보내기</button>
           </div>
         </> : <>
+          {adminLock.status?.locked && (
+            <span className="lock-badge" title="다른 관리자가 잠그거나 2분 동안 동작이 없으면 자동으로 풀립니다">
+              🔒 {adminLock.status.holder_label || "다른 관리자"} 사용 중
+            </span>
+          )}
           <span className="label-strong">관리자 PIN</span>
-          <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)} placeholder="PIN 입력" style={{ flex: "1 1 120px", minWidth: 0 }} />
+          <input type="password" value={pinInput} onChange={e => setPinInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") unlock(); }}
+            placeholder="PIN 입력" style={{ flex: "1 1 100px", minWidth: 0 }} />
+          <input type="text" value={adminLock.label} onChange={e => adminLock.setLabel(e.target.value)}
+            placeholder="이름(선택)" maxLength={20} style={{ flex: "0 1 96px", minWidth: 0 }} />
           <div className="panel-actions">
-            <button onClick={unlock}>잠금 해제</button>
+            <button onClick={unlock} disabled={unlocking || adminLock.checking}>{unlocking ? "확인 중…" : "잠금 해제"}</button>
             <button onClick={copyViewerLink}>링크 복사</button>
           </div>
         </>}
@@ -3058,6 +3090,7 @@ const setGkAward = (pid: string | null) => {
           -webkit-backdrop-filter: blur(18px) saturate(140%);
           box-shadow: var(--shadow-md), var(--ring);
         }
+        .lock-badge { font-size:12px; font-weight:700; padding:3px 10px; border-radius: var(--r-pill); background: rgba(255,170,0,.14); color:#ffb020; border:1px solid rgba(255,170,0,.4); white-space:nowrap; }
         .sync-banner { margin: 10px 0 0; padding: 10px 14px; border-radius: var(--r-md); font-size: 13px; font-weight: 600; line-height: 1.45; }
         .sync-banner.info { background: rgba(120,160,255,.12); color: var(--text); border: 1px solid rgba(120,160,255,.35); }
         .sync-banner.warn { background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger); }

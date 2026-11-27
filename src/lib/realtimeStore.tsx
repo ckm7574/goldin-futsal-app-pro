@@ -15,6 +15,8 @@ type Opts<T> = {
   readonly?: boolean;              // true면 Supabase에 절대 write하지 않음
   guard?: WriteGuard<T>;           // 대량 삭제 등 위험한 덮어쓰기 차단
   onBlocked?: (reason: string, next: T) => boolean; // true 반환 시 사용자가 강제 저장 승인
+  /** 저장 함수 (관리자 토큰 검증하는 서버 함수 futsal_save 사용). 없으면 직접 upsert */
+  save?: (payload: T) => Promise<void>;
 };
 
 export type SyncStatus =
@@ -43,6 +45,21 @@ export function useRealtimeJsonState<T>(initial: T, opts: Opts<T> = {}) {
   const [status, setStatus] = useState<SyncStatus>("loading");
   const [ready, setReady] = useState(false);       // 서버 로드 성공 여부 (= 쓰기 가능)
   const [lastError, setLastError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
+  const prevReadonlyRef = useRef(readonly);
+
+  // 보기 전용 → 관리자로 바뀔 때: 화면 데이터가 오래됐을 수 있으니 서버에서 다시 불러온 뒤에만 저장 허용
+  useEffect(() => {
+    const was = prevReadonlyRef.current;
+    prevReadonlyRef.current = readonly;
+    if (was && !readonly) {
+      loadedRef.current = false;
+      dirtyRef.current = false;
+      setReady(false);
+      setStatus("loading");
+      setReloadTick(t => t + 1);
+    }
+  }, [readonly]);
 
   // 서버에 마지막으로 존재한다고 확인된 값 (로드/실시간/저장 성공 시 갱신)
   const serverRef = useRef<T | null>(null);
@@ -52,8 +69,10 @@ export function useRealtimeJsonState<T>(initial: T, opts: Opts<T> = {}) {
   const timer = useRef<number | null>(null);
   const guardRef = useRef(opts.guard);
   const onBlockedRef = useRef(opts.onBlocked);
+  const saveRef = useRef(opts.save);
   guardRef.current = opts.guard;
   onBlockedRef.current = opts.onBlocked;
+  saveRef.current = opts.save;
 
   /** 앱에서 호출하는 setter — 사용자 변경으로 간주 */
   const setValue = useCallback((next: T) => {
@@ -106,7 +125,7 @@ export function useRealtimeJsonState<T>(initial: T, opts: Opts<T> = {}) {
     }
     load();
     return () => { cancelled = true; if (retryTimer) window.clearTimeout(retryTimer); };
-  }, [table, id]);
+  }, [table, id, reloadTick]);
 
   // ---- Realtime 구독 ----
   useEffect(() => {
@@ -131,7 +150,7 @@ export function useRealtimeJsonState<T>(initial: T, opts: Opts<T> = {}) {
   // ---- Debounced write (가드 통과 시에만) ----
   useEffect(() => {
     if (!ready || !loadedRef.current) return;   // 서버 로드 성공 전 절대 쓰지 않음
-    if (readonly) return;                        // 비인증 접속자는 쓰지 않음
+    if (readonly) { dirtyRef.current = false; return; } // 보기 전용: 쓰지 않고, 나중에 관리자가 돼도 묵은 변경을 쓰지 않음
     if (!dirtyRef.current) return;               // 서버에서 온 값은 다시 쓰지 않음
 
     if (timer.current) window.clearTimeout(timer.current);
@@ -153,10 +172,14 @@ export function useRealtimeJsonState<T>(initial: T, opts: Opts<T> = {}) {
       }
 
       try {
-        const { error } = await supabase
-          .from(table)
-          .upsert({ id, payload: next }, { onConflict: "id" });
-        if (error) throw error;
+        if (saveRef.current) {
+          await saveRef.current(next);
+        } else {
+          const { error } = await supabase
+            .from(table)
+            .upsert({ id, payload: next }, { onConflict: "id" });
+          if (error) throw error;
+        }
         serverRef.current = next;
         dirtyRef.current = false;
         setStatus("ok");

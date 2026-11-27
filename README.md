@@ -44,3 +44,11 @@ alter publication supabase_realtime add table public.futsal_state;
 - 모든 변경 직전 값을 `futsal_state_history`에 자동 백업 (최근 500개)
 - 경기 기록/선수가 대량으로 사라지는 저장은 DB가 거부
 - 앱도 서버에서 불러오기에 성공하기 전에는 절대 저장하지 않습니다
+
+## 관리자 PIN / 한 번에 한 명만 관리자 (필수 1회 설정)
+`supabase/admin_lock_and_pin.sql` 의 `'여기에_새_PIN'` 을 새 PIN 으로 바꾼 뒤 SQL Editor 에서 실행하세요.
+- PIN 은 서버에 bcrypt 해시로만 저장되며 앱 코드에는 없습니다
+- 한 명이 잠금 해제하면, 다른 사람은 그 관리자가 [잠금]을 누르거나 2분간 동작이 없을 때까지 대기
+- PIN 을 맞게 입력하면 확인창 후 권한을 가져올 수 있고, 기존 관리자는 즉시 보기 전용으로 전환
+- 데이터 저장은 관리자 토큰을 가진 사람만 가능 (`futsal_save` 함수)
+- PIN 변경 / 관리자 강제 해제 방법은 SQL 파일 하단 참고
